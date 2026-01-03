@@ -20,7 +20,7 @@ export interface ProjectCreate {
     status?: string;
 }
 
-const API_Base_URL = "http://localhost:8000/api/v1";
+const API_Base_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 export async function fetchProjects(): Promise<Project[]> {
     const response = await fetch(`${API_Base_URL}/projects/`);

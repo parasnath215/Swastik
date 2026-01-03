@@ -4,6 +4,7 @@ from typing import Optional
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Shree Swastik PMS"
     API_V1_STR: str = "/api/v1"
+    SECRET_KEY: str # loaded from .env
     
     # Database
     POSTGRES_USER: str = "postgres"
