@@ -1,6 +1,7 @@
 [build]
+  base = "frontend"  # or whatever your frontend folder is
   command = "npm run build"
-  publish = "out"
+  publish = ".next"  # or "out" if using static export
 
 [[redirects]]
   from = "/*"
