@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 import { Calendar, Settings, ChevronLeft, ChevronRight, Layers, Box } from 'lucide-react';
@@ -98,7 +98,7 @@ export default function GanttReport() {
                     <div className="flex-1 relative h-24">
                        {/* Grid lines for each day to map visual tracking */}
                        {[...Array(daysToShow)].map((_, i) => (
-                         <div key={i} className="absolute top-0 bottom-0 border-l border-slate-800/30" style={{ left: \`\${(i / daysToShow) * 100}%\` }}></div>
+                         <div key={i} className="absolute top-0 bottom-0 border-l border-slate-800/30" style={{ left: `${(i / daysToShow) * 100}%` }}></div>
                        ))}
 
                        {/* Task Bars */}
@@ -123,8 +123,8 @@ export default function GanttReport() {
                             <div 
                               key={task.id}
                               className="absolute top-3 bottom-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 shadow-[0_0_15px_rgba(16,185,129,0.3)] border border-emerald-400/50 overflow-hidden cursor-pointer hover:shadow-[0_0_20px_rgba(16,185,129,0.5)] hover:scale-[1.01] transition-all z-10 flex flex-col justify-center px-3"
-                              style={{ left: \`\${leftPct}%\`, width: \`\${widthPct}%\` }}
-                              title={\`Project: \${task.phase?.project?.name}\nMaterial: \${materialName}\nCost: ₹\${task.actualCost}\`}
+                              style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
+                              title={`Project: ${task.phase?.project?.name}\nMaterial: ${materialName}\nCost: ₹${task.actualCost}`}
                             >
                                <div className="truncate font-black text-white text-xs drop-shadow-md tracking-wide">
                                  {task.phase?.project?.name || 'Project'} - {task.phase?.name || 'Phase'}
