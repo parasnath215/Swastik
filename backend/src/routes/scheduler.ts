@@ -20,7 +20,7 @@ router.get('/tasks', async (req, res) => {
 // Schedule a new task (The Queue Logic)
 router.post('/schedule', authorizeRoles('SUPER_ADMIN', 'ADMIN', 'OPERATOR'), async (req, res) => {
   try {
-    const { phaseId, machineId, processId, duration, startTime } = req.body;
+    const { phaseId, machineId, processId, materialId, duration, startTime } = req.body;
     // duration in minutes
     
     // Find conflicting tasks for this machine
@@ -47,6 +47,7 @@ router.post('/schedule', authorizeRoles('SUPER_ADMIN', 'ADMIN', 'OPERATOR'), asy
         phaseId,
         machineId,
         processId: processId || null,
+        materialId: materialId || null,
         duration: parseInt(duration),
         startTime: calculatedStart,
         endTime: calculatedEnd
@@ -63,7 +64,10 @@ router.post('/schedule', authorizeRoles('SUPER_ADMIN', 'ADMIN', 'OPERATOR'), asy
 router.patch('/tasks/:id', authorizeRoles('SUPER_ADMIN', 'ADMIN', 'OPERATOR'), async (req, res) => {
   try {
     const { action, hours } = req.body;
-    const task = await prisma.task.findUnique({ where: { id: req.params.id as string } });
+    const task = await prisma.task.findUnique({ 
+      where: { id: req.params.id as string },
+      include: { machine: true, material: true }
+    });
     if (!task) return res.status(404).json({ error: 'Task not found' });
 
     let newEndTime = task.endTime;
@@ -84,9 +88,14 @@ router.patch('/tasks/:id', authorizeRoles('SUPER_ADMIN', 'ADMIN', 'OPERATOR'), a
       newEndTime = new Date(task.startTime.getTime() + newDuration * 60000);
     }
 
+    // Auto-compute actual cost based on duration
+    const machineCost = (newDuration / 60) * (task.machine?.hourlyRate || 0);
+    const materialCost = task.material?.unitCost || 0;
+    const actualCost = machineCost + materialCost;
+
     const updatedTask = await prisma.task.update({
       where: { id: req.params.id as string },
-      data: { endTime: newEndTime, duration: newDuration }
+      data: { endTime: newEndTime, duration: newDuration, actualCost }
     });
 
     res.json(updatedTask);

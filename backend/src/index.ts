@@ -7,6 +7,7 @@ import phaseRoutes from './routes/phases';
 import schedulerRoutes from './routes/scheduler';
 import financeRoutes from './routes/finance';
 import resourceRoutes from './routes/resources';
+import userRoutes from './routes/users';
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ app.use('/api/phases', phaseRoutes);
 app.use('/api/scheduler', schedulerRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/resources', resourceRoutes);
+app.use('/api/users', userRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', time: new Date().toISOString() });

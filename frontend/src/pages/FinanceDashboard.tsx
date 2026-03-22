@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { TrendingUp, DollarSign, Activity, PieChart } from 'lucide-react';
+import { TrendingUp, IndianRupee, Activity, PieChart } from 'lucide-react';
 
 export default function FinanceDashboard() {
   const { data: finances } = useQuery({
@@ -30,10 +30,10 @@ export default function FinanceDashboard() {
            <div className="flex justify-between items-start mb-4 relative z-10">
              <div>
                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Allocated Budget</p>
-               <h3 className="text-4xl font-black text-white mt-2 tracking-tight">${totalBudget.toLocaleString()}</h3>
+               <h3 className="text-4xl font-black text-white mt-2 tracking-tight">₹{totalBudget.toLocaleString()}</h3>
              </div>
              <div className="p-4 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 text-blue-400 rounded-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]">
-               <DollarSign className="w-6 h-6" />
+               <IndianRupee className="w-6 h-6" />
              </div>
            </div>
         </div>
@@ -43,7 +43,7 @@ export default function FinanceDashboard() {
            <div className="flex justify-between items-start mb-4 relative z-10">
              <div>
                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Project Expenses</p>
-               <h3 className="text-4xl font-black text-white mt-2 tracking-tight">${totalSpent.toLocaleString()}</h3>
+               <h3 className="text-4xl font-black text-white mt-2 tracking-tight">₹{totalSpent.toLocaleString()}</h3>
              </div>
              <div className="p-4 bg-gradient-to-br from-rose-500/20 to-orange-500/20 text-rose-400 rounded-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]">
                <TrendingUp className="w-6 h-6" />
@@ -57,7 +57,7 @@ export default function FinanceDashboard() {
              <div>
                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Net Variance (Margin)</p>
                <h3 className={`text-4xl font-black mt-2 tracking-tight ${variance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                 ${variance.toLocaleString()}
+                 ₹{variance.toLocaleString()}
                </h3>
              </div>
              <div className={`p-4 rounded-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] ${variance >= 0 ? 'bg-gradient-to-br from-emerald-500/20 to-teal-500/20 text-emerald-400' : 'bg-gradient-to-br from-rose-500/20 to-pink-500/20 text-rose-400'}`}>
@@ -79,7 +79,7 @@ export default function FinanceDashboard() {
             <BarChart data={finances || []} margin={{ top: 20, right: 30, left: 10, bottom: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
               <XAxis dataKey="projectName" stroke="#64748b" tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 500}} axisLine={false} tickLine={false} tickMargin={15} />
-              <YAxis stroke="#64748b" tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 500}} axisLine={false} tickLine={false} tickFormatter={(value) => `$${value}`} tickMargin={15} />
+              <YAxis stroke="#64748b" tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 500}} axisLine={false} tickLine={false} tickFormatter={(value) => `₹${value}`} tickMargin={15} />
               <Tooltip 
                 cursor={{ fill: '#1e293b', opacity: 0.4 }}
                 contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '16px', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.1)', padding: '12px 16px', fontWeight: 600 }}

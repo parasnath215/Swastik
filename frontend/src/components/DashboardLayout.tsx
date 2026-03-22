@@ -7,7 +7,9 @@ import {
   PieChart, 
   LogOut,
   User as UserIcon,
-  Settings
+  Settings,
+  Users,
+  BarChartHorizontal
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -25,7 +27,9 @@ export default function DashboardLayout() {
     { name: 'Project Intake', path: '/intake', icon: Building2, roles: ['SUPER_ADMIN', 'ADMIN', 'SALES'] },
     { name: 'Operator Dashboard', path: '/scheduler', icon: CalendarDays, roles: ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'] },
     { name: 'Finance', path: '/finance', icon: PieChart, roles: ['SUPER_ADMIN', 'ADMIN'] },
+    { name: 'Gantt Report', path: '/gantt', icon: BarChartHorizontal, roles: ['SUPER_ADMIN', 'ADMIN'] },
     { name: 'Setup', path: '/setup', icon: Settings, roles: ['SUPER_ADMIN', 'ADMIN'] },
+    { name: 'Users', path: '/users', icon: Users, roles: ['SUPER_ADMIN'] },
   ];
 
   return (
@@ -39,7 +43,7 @@ export default function DashboardLayout() {
       <aside className="relative z-10 w-64 flex flex-col border-r border-slate-800 bg-slate-900/50 backdrop-blur-xl">
         <div className="p-6">
           <h2 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-            Sri Swastik
+            Shree Swastik
           </h2>
           <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-widest">MMS Portal</p>
         </div>

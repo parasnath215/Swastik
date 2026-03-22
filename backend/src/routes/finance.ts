@@ -22,11 +22,18 @@ router.post('/expenses', async (req, res) => {
 router.get('/dashboard', async (req, res) => {
   try {
     const projects = await prisma.project.findMany({
-      include: { expenses: true }
+      include: { 
+        expenses: true,
+        phases: { include: { tasks: true } }
+      }
     });
 
     const data = projects.map(p => {
-      const totalExpenses = p.expenses.reduce((sum, exp) => sum + exp.amount, 0);
+      let taskCost = 0;
+      p.phases.forEach((phase: any) => {
+        phase.tasks.forEach((task: any) => { taskCost += (task.actualCost || 0); });
+      });
+      const totalExpenses = p.expenses.reduce((sum: number, exp: any) => sum + exp.amount, 0) + taskCost;
       return {
         projectId: p.id,
         projectName: p.name,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import api from '../lib/api';
-import { Save, User, Phone, MapPin, Ruler, DollarSign } from 'lucide-react';
+import { Save, User, Phone, MapPin, Ruler, IndianRupee } from 'lucide-react';
 
 export default function ProjectIntake() {
   const [formData, setFormData] = useState({
@@ -72,9 +72,9 @@ export default function ProjectIntake() {
             </div>
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Budget ($)</label>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Budget (₹)</label>
             <div className="relative">
-              <DollarSign className="absolute left-3 top-3 w-5 h-5 text-slate-500" />
+              <IndianRupee className="absolute left-3 top-3 w-5 h-5 text-slate-500" />
               <input type="number" required name="budget" value={formData.budget} onChange={handleChange} className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-white transition-all outline-none" placeholder="50000" />
             </div>
           </div>

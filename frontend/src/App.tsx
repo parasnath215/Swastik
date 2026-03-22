@@ -9,6 +9,8 @@ import PhaseManager from './pages/PhaseManager';
 import Scheduler from './pages/Scheduler';
 import FinanceDashboard from './pages/FinanceDashboard';
 import Setup from './pages/Setup';
+import UsersManagement from './pages/UsersManagement';
+import GanttReport from './pages/GanttReport';
 const ProtectedRoute = ({ children, roles }: { children: React.ReactNode, roles?: string[] }) => {
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
@@ -42,7 +44,18 @@ function App() {
             <ProtectedRoute roles={['SUPER_ADMIN', 'ADMIN']}>
               <Setup />
             </ProtectedRoute>
-          } />        </Route>
+          } />
+          <Route path="users" element={
+            <ProtectedRoute roles={['SUPER_ADMIN']}>
+              <UsersManagement />
+            </ProtectedRoute>
+          } />
+          <Route path="gantt" element={
+            <ProtectedRoute roles={['SUPER_ADMIN', 'ADMIN']}>
+              <GanttReport />
+            </ProtectedRoute>
+          } />
+        </Route>
       </Routes>
     </Router>
   );

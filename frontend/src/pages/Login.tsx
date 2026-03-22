@@ -35,7 +35,7 @@ export default function Login() {
           <div className="p-3 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl mb-4 ring-1 ring-blue-500/30">
             <Factory className="w-8 h-8 text-blue-400" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent mb-1">Sri Swastik</h1>
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent mb-1">Shree Swastik</h1>
           <p className="text-slate-400 text-sm font-medium">Manufacturing Management</p>
         </div>
 

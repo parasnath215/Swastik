@@ -65,6 +65,7 @@ model Machine {
   id          String   @id @default(uuid())
   name        String
   description String?
+  hourlyRate  Float?   @default(0)
   resources   PhaseResource[]
   tasks       Task[]
   createdAt   DateTime @default(now())
@@ -85,7 +86,9 @@ model Material {
   id          String   @id @default(uuid())
   name        String
   description String?
+  unitCost    Float?   @default(0)
   resources   PhaseResource[]
+  tasks       Task[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -98,7 +101,10 @@ model Task {
   machine     Machine? @relation(fields: [machineId], references: [id])
   processId   String?
   process     Process? @relation(fields: [processId], references: [id])
+  materialId  String?
+  material    Material? @relation(fields: [materialId], references: [id])
   duration    Int      // Duration in minutes
+  actualCost  Float?   @default(0)
   startTime   DateTime
   endTime     DateTime
   operatorId  String?

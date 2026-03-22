@@ -8,7 +8,7 @@ type TabType = 'machines' | 'processes' | 'materials';
 export default function Setup() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('machines');
-  const [formData, setFormData] = useState({ name: '', description: '' });
+  const [formData, setFormData] = useState({ name: '', description: '', hourlyRate: 0, unitCost: 0 });
 
   // Fetching
   const { data: machines, isLoading: mLoading } = useQuery({ queryKey: ['machines'], queryFn: async () => (await api.get('/resources/machines')).data });
@@ -28,7 +28,7 @@ export default function Setup() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [activeTab] });
-      setFormData({ name: '', description: '' });
+      setFormData({ name: '', description: '', hourlyRate: 0, unitCost: 0 });
     },
     onError: (err: any) => alert(err.response?.data?.error || 'Failed to create resource')
   });
@@ -103,6 +103,35 @@ export default function Setup() {
                   placeholder="Additional details..."
                 />
               </div>
+              
+              {activeTab === 'machines' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-1">Hourly Rate (₹) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={formData.hourlyRate}
+                    onChange={(e) => setFormData({ ...formData, hourlyRate: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-slate-950/80 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-600"
+                  />
+                </div>
+              )}
+
+              {activeTab === 'materials' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-1">Unit Cost (₹) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={formData.unitCost}
+                    onChange={(e) => setFormData({ ...formData, unitCost: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-slate-950/80 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-600"
+                  />
+                </div>
+              )}
+
               <button 
                 type="submit" 
                 disabled={createResource.isPending || !formData.name}
@@ -133,6 +162,8 @@ export default function Setup() {
                      <div>
                        <h4 className="font-semibold text-slate-200">{item.name}</h4>
                        {item.description && <p className="text-sm text-slate-500 mt-1">{item.description}</p>}
+                       {activeTab === 'machines' && <p className="text-xs font-bold text-slate-400 mt-2 uppercase tracking-wide">Rate: ₹{item.hourlyRate}/Hr</p>}
+                       {activeTab === 'materials' && <p className="text-xs font-bold text-slate-400 mt-2 uppercase tracking-wide">Unit Cost: ₹{item.unitCost}</p>}
                      </div>
                      <div className="flex space-x-2">
                        {/* Edit functionality left out for brevity, but easy to add if needed */}

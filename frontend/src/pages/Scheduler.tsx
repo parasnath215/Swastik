@@ -19,6 +19,7 @@ export default function Scheduler() {
   const [runtimeHours, setRuntimeHours] = useState<number>(24);
   const [startTime, setStartTime] = useState<string>('');
   const [selectedMachineId, setSelectedMachineId] = useState<string>('');
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
   const [conflictError, setConflictError] = useState<string | null>(null);
   const [timelineMachineFilter, setTimelineMachineFilter] = useState<string>('');
 
@@ -26,6 +27,7 @@ export default function Scheduler() {
   const { data: tasks } = useQuery({ queryKey: ['tasks'], queryFn: async () => (await api.get('/scheduler/tasks')).data });
   const { data: projects } = useQuery({ queryKey: ['projects'], queryFn: async () => (await api.get('/projects')).data });
   const { data: machines } = useQuery({ queryKey: ['machines'], queryFn: async () => (await api.get('/resources/machines')).data });
+  const { data: materials } = useQuery({ queryKey: ['materials'], queryFn: async () => (await api.get('/resources/materials')).data });
 
   // Mutation
   const scheduleMutation = useMutation({
@@ -125,6 +127,7 @@ export default function Scheduler() {
     scheduleMutation.mutate({
       phaseId: scheduleModalPhase.id,
       machineId: selectedMachineId,
+      materialId: selectedMaterialId,
       startTime: startTime,
       duration: runtimeHours * 60 
     });
@@ -194,6 +197,21 @@ export default function Scheduler() {
                 </div>
 
                 <div className="space-y-3">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Target Material</label>
+                  <select 
+                    required 
+                    value={selectedMaterialId} 
+                    onChange={e => setSelectedMaterialId(e.target.value)} 
+                    className="w-full h-14 px-4 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all font-semibold appearance-none"
+                  >
+                    <option value="">-- Select Active Material --</option>
+                    {materials?.map((m: any) => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-3 md:col-span-2">
                   <label className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Start Time</label>
                   <input 
                     required 

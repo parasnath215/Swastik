@@ -17,8 +17,8 @@ router.get('/machines', async (req, res) => {
 
 router.post('/machines', authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
-    const { name, description } = req.body;
-    const data = await prisma.machine.create({ data: { name, description } });
+    const { name, description, hourlyRate } = req.body;
+    const data = await prisma.machine.create({ data: { name, description, hourlyRate: hourlyRate ? parseFloat(hourlyRate) : 0 } });
     res.status(201).json(data);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create machine' });
@@ -27,8 +27,10 @@ router.post('/machines', authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res
 
 router.patch('/machines/:id', authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
-    const { name, description } = req.body;
-    const data = await prisma.machine.update({ where: { id: req.params.id as string }, data: { name, description } });
+    const { name, description, hourlyRate } = req.body;
+    const updateData: any = { name, description };
+    if (hourlyRate !== undefined) updateData.hourlyRate = parseFloat(hourlyRate);
+    const data = await prisma.machine.update({ where: { id: req.params.id as string }, data: updateData });
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update machine' });
@@ -95,8 +97,8 @@ router.get('/materials', async (req, res) => {
 
 router.post('/materials', authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
-    const { name, description } = req.body;
-    const data = await prisma.material.create({ data: { name, description } });
+    const { name, description, unitCost } = req.body;
+    const data = await prisma.material.create({ data: { name, description, unitCost: unitCost ? parseFloat(unitCost) : 0 } });
     res.status(201).json(data);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create material' });
@@ -105,8 +107,10 @@ router.post('/materials', authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, re
 
 router.patch('/materials/:id', authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
-    const { name, description } = req.body;
-    const data = await prisma.material.update({ where: { id: req.params.id as string }, data: { name, description } });
+    const { name, description, unitCost } = req.body;
+    const updateData: any = { name, description };
+    if (unitCost !== undefined) updateData.unitCost = parseFloat(unitCost);
+    const data = await prisma.material.update({ where: { id: req.params.id as string }, data: updateData });
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update material' });
