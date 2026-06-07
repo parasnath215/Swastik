@@ -30,4 +30,19 @@ app.get('/health', (req, res) => {
 });
 app.listen(PORT, () => {
     console.log(`SSMS Backend running on port ${PORT}`);
+    // Keep-alive self-pinger for Render Free Tier
+    const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
+    if (RENDER_URL) {
+        console.log(`Render environment detected. Starting self-pinger to keep-alive: ${RENDER_URL}`);
+        // Ping self every 10 minutes (600,000 ms) to prevent sleeping
+        setInterval(() => {
+            fetch(`${RENDER_URL}/health`)
+                .then((res) => console.log(`Self-ping keep-alive status: ${res.status}`))
+                .catch((err) => {
+                // Check if err is an object and has a message property
+                const errMsg = err instanceof Error ? err.message : String(err);
+                console.error('Self-ping keep-alive failed:', errMsg);
+            });
+        }, 600000);
+    }
 });
