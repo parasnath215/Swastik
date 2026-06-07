@@ -5,7 +5,13 @@ services:
     env: node
     rootDir: backend
     buildCommand: npm install && npm run build
-    startCommand: npx prisma db push && npm start
+    startCommand: |
+      i=0; while [ $i -lt 15 ] && ! npx prisma db push; do i=$((i+1)); sleep 3; done
+      if [ $i -eq 15 ]; then
+        echo "Database connection failed after 15 retries."
+        exit 1
+      fi
+      npm start
     envVars:
       - key: DATABASE_URL
         fromDatabase:
