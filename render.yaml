@@ -8,7 +8,9 @@ services:
     startCommand: npx prisma db push && npm start
     envVars:
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: swastik-db
+          property: connectionString
       - key: JWT_SECRET
         generateValue: true
       - key: PORT
@@ -29,4 +31,9 @@ services:
           envVarKey: RENDER_EXTERNAL_URL
           # Note: The /api must be appended manually in the code, or configured later if this fails to resolve with /api.
           # For safety we just pass the root URL and the frontend handles the rest, or we just configure it cleanly.
+
+databases:
+  - name: swastik-db
+    plan: free
+
 

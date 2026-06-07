@@ -62,8 +62,6 @@ The system employs strict RBAC built dynamically into React Router (`<ProtectedR
 4. **Finance Dashboard**: Real-time budget variance utilizing Recharts to map out Allocated Budget vs. Spent.
 
 ## Deployment Instructions
-1. Setup a standard host (e.g. VPS running purely on CPU).
-2. Change the Database provider in `backend/prisma/schema.prisma` to `postgresql` and place your deployment string in `.env`.
-3. Change `baseURL` in `frontend/src/lib/api.ts` to your reverse-proxy target domain (e.g. `https://api.shreeswastik.com`).
-4. Build the frontend (`cd frontend && npm run build`) and serve `dist/` with Nginx.
-5. Launch backend via PM2 (`cmd: pm2 start dist/index.js`).
+
+For deploying the system globally:
+- **Render Deployment:** Follow the automated [Render Deployment Guide](file:///e:/Websites/Swastik-main/RENDER_DEPLOYMENT_GUIDE.md) for deployment via Render Blueprints.

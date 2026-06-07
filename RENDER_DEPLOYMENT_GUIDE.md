@@ -1,25 +1,52 @@
 # Render Deployment Guide
 
-Follow these simple steps to deploy **Sri Swastik** globally using your new optimized setup!
+Follow these simple steps to deploy **Sri Swastik** globally using your Render Blueprint setup!
+
+---
+
+## ⚠️ IMPORTANT: Prisma Database Provider Setup
+
+Because Prisma requires a static database provider in `schema.prisma`, you have two choices for managing local development vs. production:
+
+### Option A: Manual Switching (Easiest if not using Docker locally)
+1. **Locally (Development):** Keep `provider = "sqlite"` in `backend/prisma/schema.prisma` and `DATABASE_URL="file:./dev.db"` in `backend/.env`.
+2. **Before Pushing to GitHub (Production):** 
+   - Open `backend/prisma/schema.prisma` and change `provider = "sqlite"` to `provider = "postgresql"`.
+   - Run `npx prisma generate` to rebuild the client configuration.
+   - Commit and push to GitHub.
+
+### Option B: Local PostgreSQL (Recommended to avoid code changes)
+1. Keep `provider = "postgresql"` in `backend/prisma/schema.prisma` and `DATABASE_URL="postgresql://admin:password123@localhost:5432/ssms?schema=public"` in `backend/.env`.
+2. Install/Open Docker Desktop on your machine.
+3. Start the local database container by running in the project root:
+   ```bash
+   docker-compose up -d
+   ```
+
+---
 
 ## 1. Push to GitHub
-Commit all the new changes to your repository and push them to GitHub. The critical changes deployed:
-- `backend/package.json` (Added build/start commands)
-- `frontend/src/lib/api.ts` (Dynamic production API URL handling)
-- `render.yaml` (The Infrastructure Blueprint)
+Commit all your changes and push them to your GitHub repository (using `git_setup.ps1` or git command line):
+```bash
+git add .
+git commit -m "Configure project for Render auto-deployment"
+git push origin main
+```
 
-## 2. Deploy via Blueprint
-Render's Blueprints feature allows you to automatically create and network all your services from one file.
-1. Create a free account at [render.com](https://render.com).
-2. Click **New** button in the dashboard, and select **Blueprint**.
+---
+
+## 2. Deploy via Render Blueprint
+We have updated `render.yaml` to automatically provision a free PostgreSQL database, link it to your Node.js backend, and connect the frontend to the backend.
+
+1. Go to [render.com](https://render.com) and log in.
+2. Click the **New +** button in the dashboard, and select **Blueprint**.
 3. Connect your GitHub repository.
-4. Render will automatically detect the `render.yaml` file. Click **Apply**.
-5. Render will automatically provision:
-   - A PostgreSQL Database (`swastik-db`)
-   - A Node HTTP Web Service (`swastik-backend`)
-   - A Static React Site (`swastik-frontend`)
-
-*(Note: The very first deployment might take a few minutes as it provisions the database and runs the Prisma migrations).*
+4. Render will automatically read `render.yaml` and prompt you to create:
+   - **`swastik-db`** (PostgreSQL Database)
+   - **`swastik-backend`** (Node/Express API)
+   - **`swastik-frontend`** (React Static Site)
+5. Click **Apply**. Render will automatically provision and deploy everything. 
+*(Note: The first deployment runs database push migrations and seeds automatically).*
 
 ---
 
@@ -38,4 +65,5 @@ You must add a Rewrite rule on Render so it routes all traffic to `index.html`.
    - **Action:** `Rewrite`
 5. Click **Save Changes**.
 
-Your application is now successfully hosted on Render and accessible anywhere!
+Your application is now successfully hosted on Render!
+
