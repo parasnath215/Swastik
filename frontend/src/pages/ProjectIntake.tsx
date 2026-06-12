@@ -41,7 +41,7 @@ export default function ProjectIntake() {
       Object.entries(formData).forEach(([key, val]) => data.append(key, val));
       files.forEach(file => data.append('files', file));
 
-      const res = await api.post('/projects', data);
+      await api.post('/projects', data);
       setSuccess('Project successfully created!');
       setFormData({ name: '', phone: '', address: '', dimensions: '', budget: '' });
       setFiles([]);

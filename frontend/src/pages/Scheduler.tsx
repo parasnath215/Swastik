@@ -4,7 +4,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import api from '../lib/api';
-import { Clock, AlertTriangle, Calendar, Briefcase, Zap, CheckCircle2, X, Send, Activity } from 'lucide-react';
+import { Clock, AlertTriangle, Calendar, Briefcase, Zap, CheckCircle2, X, Send, Activity, Settings } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';

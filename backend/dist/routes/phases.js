@@ -54,13 +54,15 @@ router.patch('/:id/status', (0, authMiddleware_1.authorizeRoles)('SUPER_ADMIN', 
 // Add a resource row to a phase
 router.post('/:id/resources', (0, authMiddleware_1.authorizeRoles)('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
     try {
-        const { machineId, processId, materialId } = req.body;
+        const { machineId, processId, materialId, materialsList, expectedDuration } = req.body;
         const resource = await prisma_1.default.phaseResource.create({
             data: {
                 phaseId: req.params.id,
                 machineId,
                 processId,
-                materialId
+                materialId,
+                materialsList: materialsList ? JSON.stringify(materialsList) : null,
+                expectedDuration: expectedDuration ? parseInt(expectedDuration) : null
             }
         });
         res.json(resource);
@@ -72,10 +74,16 @@ router.post('/:id/resources', (0, authMiddleware_1.authorizeRoles)('SUPER_ADMIN'
 // Update a resource row
 router.patch('/resources/:resId', (0, authMiddleware_1.authorizeRoles)('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
     try {
-        const { machineId, processId, materialId } = req.body;
+        const { machineId, processId, materialId, materialsList, expectedDuration } = req.body;
         const resource = await prisma_1.default.phaseResource.update({
             where: { id: req.params.resId },
-            data: { machineId, processId, materialId }
+            data: {
+                machineId,
+                processId,
+                materialId,
+                materialsList: materialsList ? JSON.stringify(materialsList) : null,
+                expectedDuration: expectedDuration ? parseInt(expectedDuration) : null
+            }
         });
         res.json(resource);
     }

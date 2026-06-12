@@ -25,6 +25,8 @@ app.use('/api/scheduler', scheduler_1.default);
 app.use('/api/finance', finance_1.default);
 app.use('/api/resources', resources_1.default);
 app.use('/api/users', users_1.default);
+const path_1 = __importDefault(require("path"));
+app.use('/uploads', express_1.default.static(path_1.default.join(process.cwd(), 'uploads')));
 app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', time: new Date().toISOString() });
 });
