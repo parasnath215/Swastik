@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { CheckCircle, AlertCircle, Trash2, Settings, Wrench, Box, Plus, ChevronDown, ChevronRight, Play } from 'lucide-react';
+import { CheckCircle, AlertCircle, Trash2, Settings, Wrench, Box, Plus, ChevronDown, ChevronRight, Play, Edit2, Check, X, Clock, MessageSquare } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
+import CreatableSelect from 'react-select/creatable';
 
 export default function PhaseManager() {
   const queryClient = useQueryClient();
@@ -10,6 +11,8 @@ export default function PhaseManager() {
   const [newPhaseNames, setNewPhaseNames] = useState<Record<string, string>>({});
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [editProjectName, setEditProjectName] = useState<string>('');
 
   const { data: projects, isLoading } = useQuery({
     queryKey: ['projects'],
@@ -37,6 +40,26 @@ export default function PhaseManager() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
     onError: (err: any) => alert(err.response?.data?.error || 'Failed to update phase')
+  });
+
+  const updateProjectName = useMutation({
+    mutationFn: async ({ id, name }: { id: string, name: string }) => {
+      await api.patch(`/projects/${id}/name`, { name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      setEditingProjectId(null);
+    },
+    onError: (err: any) => alert(err.response?.data?.error || 'Failed to update project name')
+  });
+
+  const createMaterial = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await api.post('/resources/materials', { name, unitCost: 0 });
+      return res.data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['materials'] }),
+    onError: (err: any) => alert(err.response?.data?.error || 'Failed to create material')
   });
 
   const addResource = useMutation({
@@ -110,10 +133,28 @@ export default function PhaseManager() {
 
        {projects?.map((activeProject: any) => {
           const isExpanded = selectedProjectId === activeProject.id;
-          const totalPhases = activeProject.phases?.length || 0;
-          const completedPhases = activeProject.phases?.filter((p: any) => p.status === 'ACCEPTED').length || 0;
-          const progressPercentage = totalPhases > 0 ? Math.round((completedPhases / totalPhases) * 100) : 0;
           
+          // Calculate progress by time if available
+          let totalExpectedTime = 0;
+          let completedExpectedTime = 0;
+          activeProject.phases?.forEach((p: any) => {
+            const phaseTime = p.resources?.reduce((sum: number, r: any) => sum + (r.expectedDuration || 0), 0) || 0;
+            totalExpectedTime += phaseTime;
+            if (p.status === 'ACCEPTED') {
+              completedExpectedTime += phaseTime;
+            }
+          });
+
+          let progressPercentage = 0;
+          if (totalExpectedTime > 0) {
+            progressPercentage = Math.round((completedExpectedTime / totalExpectedTime) * 100);
+          } else {
+            // Fallback to phase count
+            const totalPhases = activeProject.phases?.length || 0;
+            const completedPhases = activeProject.phases?.filter((p: any) => p.status === 'ACCEPTED').length || 0;
+            progressPercentage = totalPhases > 0 ? Math.round((completedPhases / totalPhases) * 100) : 0;
+          }
+
           const activePhase = isExpanded ? activeProject.phases?.find((p: any) => p.id === selectedPhaseId) : null;
 
           return (
@@ -130,17 +171,49 @@ export default function PhaseManager() {
                    <div className={`p-3 rounded-xl transition-colors ${isExpanded ? 'bg-teal-500/10 text-teal-400' : 'bg-slate-800 text-slate-400 group-hover:text-slate-200'}`}>
                      {isExpanded ? <ChevronDown className="w-6 h-6" /> : <ChevronRight className="w-6 h-6" />}
                    </div>
-                   <div className="min-w-0">
-                     <h1 className="text-2xl font-black text-white tracking-tight flex items-center flex-wrap gap-4 truncate">
-                       <span className="truncate">{activeProject.name}</span>
-                       <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded border shrink-0 ${
-                         activeProject.status === 'LEAD' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                         activeProject.status === 'IN_PROGRESS' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                         'bg-slate-900/80 text-teal-400 border-teal-500/20'
-                       }`}>
-                         {activeProject.status.replace('_', ' ')}
-                       </span>
-                     </h1>
+                   <div className="min-w-0 flex items-center">
+                     {editingProjectId === activeProject.id ? (
+                       <div className="flex items-center gap-2 z-20" onClick={(e) => e.stopPropagation()}>
+                         <input 
+                           autoFocus
+                           value={editProjectName}
+                           onChange={e => setEditProjectName(e.target.value)}
+                           className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white outline-none focus:border-teal-500"
+                           onKeyDown={(e) => {
+                             if (e.key === 'Enter') updateProjectName.mutate({ id: activeProject.id, name: editProjectName });
+                             if (e.key === 'Escape') setEditingProjectId(null);
+                           }}
+                         />
+                         <button onClick={() => updateProjectName.mutate({ id: activeProject.id, name: editProjectName })} className="p-1.5 text-emerald-400 hover:bg-emerald-500/20 rounded-md">
+                           <Check className="w-5 h-5" />
+                         </button>
+                         <button onClick={() => setEditingProjectId(null)} className="p-1.5 text-slate-400 hover:bg-slate-700 rounded-md">
+                           <X className="w-5 h-5" />
+                         </button>
+                       </div>
+                     ) : (
+                       <h1 className="text-2xl font-black text-white tracking-tight flex items-center flex-wrap gap-4 truncate">
+                         <span className="truncate">{activeProject.name}</span>
+                         <button 
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             setEditingProjectId(activeProject.id);
+                             setEditProjectName(activeProject.name);
+                           }} 
+                           className="p-1.5 text-slate-500 hover:text-teal-400 opacity-0 group-hover:opacity-100 transition-opacity rounded-md hover:bg-teal-500/10"
+                           title="Edit Project Name"
+                         >
+                           <Edit2 className="w-4 h-4" />
+                         </button>
+                         <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded border shrink-0 ${
+                           activeProject.status === 'LEAD' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                           activeProject.status === 'IN_PROGRESS' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                           'bg-slate-900/80 text-teal-400 border-teal-500/20'
+                         }`}>
+                           {activeProject.status.replace('_', ' ')}
+                         </span>
+                       </h1>
+                     )}
                    </div>
                  </div>
                  
@@ -281,6 +354,19 @@ export default function PhaseManager() {
                                <h2 className="text-3xl font-extrabold text-white tracking-tight flex items-center">
                                  Phase {activePhase.order}: {activePhase.name}
                                </h2>
+                               {activeProject.updates && activeProject.updates.length > 0 && (
+                                 <div className="mt-4 p-4 bg-slate-900 border border-slate-700 rounded-xl max-h-32 overflow-y-auto custom-scrollbar">
+                                   <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 flex items-center"><MessageSquare className="w-3 h-3 mr-1" /> Operator Updates</h4>
+                                   <div className="space-y-2">
+                                     {activeProject.updates.map((update: any) => (
+                                       <div key={update.id} className="text-xs text-slate-300 bg-slate-800/50 p-2 rounded-lg border border-slate-700/50">
+                                         <span className="text-blue-400 font-bold mr-2">{new Date(update.createdAt).toLocaleString()}:</span>
+                                         {update.content}
+                                       </div>
+                                     ))}
+                                   </div>
+                                 </div>
+                               )}
                                <div className="mt-3 flex items-center">
                                  <span className={`text-xs font-black uppercase tracking-widest px-3 py-1 rounded-md border shadow-sm ${
                                    activePhase.status === 'ACCEPTED' ? 'bg-teal-500/10 text-teal-400 border-teal-500/20' : 
@@ -326,17 +412,31 @@ export default function PhaseManager() {
                               <table className="w-full text-left text-sm text-slate-300 border-collapse min-w-[600px]">
                                 <thead className="bg-[#1e293b] text-[11px] uppercase font-black tracking-widest text-slate-500 border-b border-slate-800">
                                   <tr>
-                                    <th className="px-6 py-4 w-[30%]"><div className="flex items-center"><Settings className="w-4 h-4 mr-2 stroke-[2.5px]" /> Machine</div></th>
-                                    <th className="px-6 py-4 w-[30%]"><div className="flex items-center"><Wrench className="w-4 h-4 mr-2 stroke-[2.5px]" /> Process</div></th>
+                                    <th className="px-6 py-4 w-[25%]"><div className="flex items-center"><Settings className="w-4 h-4 mr-2 stroke-[2.5px]" /> Machine</div></th>
+                                    <th className="px-6 py-4 w-[20%]"><div className="flex items-center"><Wrench className="w-4 h-4 mr-2 stroke-[2.5px]" /> Process</div></th>
                                     <th className="px-6 py-4 w-[30%]"><div className="flex items-center"><Box className="w-4 h-4 mr-2 stroke-[2.5px]" /> Material</div></th>
+                                    <th className="px-6 py-4 w-[15%]"><div className="flex items-center"><Clock className="w-4 h-4 mr-2 stroke-[2.5px]" /> Est. Time (Hrs)</div></th>
                                     <th className="px-6 py-4 w-[10%] text-center">Actions</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/60">
                                   {activePhase.resources?.length === 0 && (
-                                     <tr><td colSpan={4} className="px-6 py-16 text-center text-slate-500 font-semibold border-t border-slate-800 border-dashed">No routings assigned. The operator will not be able to commence work.</td></tr>
+                                     <tr><td colSpan={5} className="px-6 py-16 text-center text-slate-500 font-semibold border-t border-slate-800 border-dashed">No routings assigned. The operator will not be able to commence work.</td></tr>
                                   )}
-                                  {activePhase.resources?.map((res: any) => (
+                                  {activePhase.resources?.map((res: any) => {
+                                    
+                                    const materialOptions = materials?.map((m: any) => ({ label: m.name, value: m.id })) || [];
+                                    let selectedMaterials = [];
+                                    if (res.materialsList) {
+                                      try {
+                                        const parsed = JSON.parse(res.materialsList);
+                                        selectedMaterials = parsed.map((id: string) => materialOptions.find((m:any) => m.value === id) || { label: 'Unknown', value: id });
+                                      } catch (e) {}
+                                    } else if (res.materialId) {
+                                      selectedMaterials = [materialOptions.find((m:any) => m.value === res.materialId)].filter(Boolean);
+                                    }
+
+                                    return (
                                     <tr key={res.id} className="hover:bg-slate-800/40 transition-colors group">
                                       <td className="px-6 py-4 relative">
                                         <select 
@@ -359,14 +459,46 @@ export default function PhaseManager() {
                                         </select>
                                       </td>
                                       <td className="px-6 py-4 relative">
-                                        <select 
-                                          value={res.materialId || ''} 
-                                          onChange={(e) => updateResource.mutate({ resId: res.id, data: { materialId: e.target.value } })}
-                                          className="w-full bg-[#1e293b] border border-slate-700/80 rounded-lg pl-3 pr-8 py-2.5 text-slate-200 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 appearance-none font-medium transition-colors"
-                                        >
-                                          <option value="">-- Optional --</option>
-                                          {materials?.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                                        </select>
+                                        <CreatableSelect 
+                                          isMulti
+                                          options={materialOptions}
+                                          value={selectedMaterials}
+                                          onChange={(newValue) => {
+                                            const newIds = newValue.map((v: any) => v.value);
+                                            updateResource.mutate({ resId: res.id, data: { materialsList: newIds } });
+                                          }}
+                                          onCreateOption={async (inputValue) => {
+                                            const newMat = await createMaterial.mutateAsync(inputValue);
+                                            const updatedIds = [...selectedMaterials.map((m:any) => m.value), newMat.id];
+                                            updateResource.mutate({ resId: res.id, data: { materialsList: updatedIds } });
+                                          }}
+                                          styles={{
+                                            control: (base) => ({
+                                              ...base,
+                                              backgroundColor: '#1e293b',
+                                              borderColor: 'rgba(51, 65, 85, 0.8)',
+                                              borderRadius: '0.5rem',
+                                              padding: '2px',
+                                              minHeight: '42px',
+                                            }),
+                                            menu: (base) => ({ ...base, backgroundColor: '#0f172a', zIndex: 50 }),
+                                            option: (base, state) => ({ ...base, backgroundColor: state.isFocused ? '#1e293b' : 'transparent', color: '#cbd5e1' }),
+                                            multiValue: (base) => ({ ...base, backgroundColor: '#334155', borderRadius: '4px' }),
+                                            multiValueLabel: (base) => ({ ...base, color: '#f8fafc' }),
+                                            input: (base) => ({ ...base, color: '#f8fafc' }),
+                                            singleValue: (base) => ({ ...base, color: '#f8fafc' })
+                                          }}
+                                          placeholder="Select materials..."
+                                        />
+                                      </td>
+                                      <td className="px-6 py-4 relative">
+                                        <input 
+                                          type="number"
+                                          placeholder="Hrs"
+                                          value={res.expectedDuration || ''}
+                                          onChange={(e) => updateResource.mutate({ resId: res.id, data: { expectedDuration: e.target.value ? parseInt(e.target.value) : null } })}
+                                          className="w-full bg-[#1e293b] border border-slate-700/80 rounded-lg px-3 py-2.5 text-slate-200 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 font-medium transition-colors"
+                                        />
                                       </td>
                                       <td className="px-6 py-4 text-center">
                                         <button 
@@ -378,7 +510,7 @@ export default function PhaseManager() {
                                         </button>
                                       </td>
                                     </tr>
-                                  ))}
+                                  )})}
                                 </tbody>
                               </table>
                             </div>

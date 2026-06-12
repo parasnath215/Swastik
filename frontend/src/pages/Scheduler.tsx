@@ -4,8 +4,19 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import api from '../lib/api';
-import { Clock, AlertTriangle, Calendar, Briefcase, Zap, CheckCircle2, X } from 'lucide-react';
+import { Clock, AlertTriangle, Calendar, Briefcase, Zap, CheckCircle2, X, Send, Activity } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+
+const getDefaultDate = () => {
+  const d = new Date();
+  d.setHours(9, 0, 0, 0);
+  if (d < new Date()) {
+    d.setDate(d.getDate() + 1);
+  }
+  return d;
+};
 
 export default function Scheduler() {
   const queryClient = useQueryClient();
@@ -17,11 +28,14 @@ export default function Scheduler() {
   
   // Form State
   const [runtimeHours, setRuntimeHours] = useState<number>(24);
-  const [startTime, setStartTime] = useState<string>('');
+  const [startDate, setStartDate] = useState<Date>(getDefaultDate());
   const [selectedMachineId, setSelectedMachineId] = useState<string>('');
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
   const [conflictError, setConflictError] = useState<string | null>(null);
   const [timelineMachineFilter, setTimelineMachineFilter] = useState<string>('');
+  const [timelineProjectFilter, setTimelineProjectFilter] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'MACHINES' | 'PROCESSES'>('MACHINES');
+  const [operatorNote, setOperatorNote] = useState('');
 
   // Queries
   const { data: tasks } = useQuery({ queryKey: ['tasks'], queryFn: async () => (await api.get('/scheduler/tasks')).data });
@@ -38,11 +52,22 @@ export default function Scheduler() {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       setConflictError(null);
       setScheduleModalPhase(null); // Close Modal on success
-      setStartTime(''); // Reset Form
+      setStartDate(getDefaultDate()); // Reset Form
     },
     onError: (err: any) => {
       setConflictError(err.response?.data?.error || 'Failed to schedule task.');
     }
+  });
+
+  const submitUpdateMutation = useMutation({
+    mutationFn: async ({ projectId, content }: { projectId: string, content: string }) => {
+      await api.post(`/projects/${projectId}/updates`, { content });
+    },
+    onSuccess: () => {
+      setOperatorNote('');
+      alert('Update submitted to Admin!');
+    },
+    onError: (err: any) => alert(err.response?.data?.error || 'Failed to submit update')
   });
 
   // Calculate The Running Task (Next Upcoming or Current Task)
@@ -102,12 +127,12 @@ export default function Scheduler() {
     e.preventDefault();
     setConflictError(null);
 
-    if (!selectedMachineId || !startTime || !runtimeHours || !scheduleModalPhase) {
+    if (!selectedMachineId || !startDate || !runtimeHours || !scheduleModalPhase) {
       setConflictError("Please fill all required fields.");
       return;
     }
 
-    const start = new Date(startTime).getTime();
+    const start = startDate.getTime();
     const end = start + (runtimeHours * 60 * 60 * 1000);
 
     if (tasks) {
@@ -128,9 +153,14 @@ export default function Scheduler() {
       phaseId: scheduleModalPhase.id,
       machineId: selectedMachineId,
       materialId: selectedMaterialId,
-      startTime: startTime,
+      startTime: startDate.toISOString(),
       duration: runtimeHours * 60 
     });
+  };
+
+  const getOccupiedDates = () => {
+    if (!tasks || !selectedMachineId) return [];
+    return tasks.filter((t: any) => t.machineId === selectedMachineId).map((t: any) => new Date(t.startTime));
   };
 
   // Timeline Prep
@@ -141,7 +171,11 @@ export default function Scheduler() {
     return `hsl(${h}, 80%, 45%)`;
   };
 
-  const timelineEvents = tasks?.filter((t: any) => !timelineMachineFilter || t.machineId === timelineMachineFilter).map((t: any) => {
+  const timelineEvents = tasks?.filter((t: any) => {
+    if (timelineMachineFilter && t.machineId !== timelineMachineFilter) return false;
+    if (timelineProjectFilter && t.phase?.projectId !== timelineProjectFilter) return false;
+    return true;
+  }).map((t: any) => {
     const bgColor = t.machineId ? getStringColor(t.machineId) : '#3b82f6';
     return {
       id: t.id,
@@ -212,14 +246,24 @@ export default function Scheduler() {
                 </div>
 
                 <div className="space-y-3 md:col-span-2">
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Start Time</label>
-                  <input 
-                    required 
-                    type="datetime-local" 
-                    value={startTime}
-                    onChange={e => setStartTime(e.target.value)} 
-                    className="w-full h-14 px-4 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all block [color-scheme:dark] font-bold" 
-                  />
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Start Time (Occupied Dates in Red)</label>
+                  <div className="custom-datepicker-wrapper">
+                    <DatePicker 
+                      selected={startDate}
+                      onChange={(date: Date | null) => date && setStartDate(date)} 
+                      showTimeSelect
+                      timeFormat="HH:mm"
+                      timeIntervals={15}
+                      timeCaption="time"
+                      dateFormat="MMMM d, yyyy h:mm aa"
+                      highlightDates={[
+                        {
+                          "react-datepicker__day--highlighted-custom-red": getOccupiedDates(),
+                        }
+                      ]}
+                      className="w-full h-14 px-4 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all block [color-scheme:dark] font-bold" 
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -270,7 +314,6 @@ export default function Scheduler() {
         </div>
       )}
 
-      {/* TOP HEADER */}
       <div className="flex justify-between items-center bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl">
         <div className="flex items-center gap-6">
           <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center border-2 border-slate-700 shadow-inner">
@@ -284,6 +327,20 @@ export default function Scheduler() {
               </span>
             </div>
           </div>
+        </div>
+        <div className="flex items-center gap-2 bg-slate-800/50 p-1.5 rounded-xl border border-slate-700">
+          <button 
+            onClick={() => setViewMode('MACHINES')}
+            className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-colors ${viewMode === 'MACHINES' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            <Settings className="w-4 h-4 inline-block mr-1.5 -mt-0.5" /> Machine View
+          </button>
+          <button 
+            onClick={() => setViewMode('PROCESSES')}
+            className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-colors ${viewMode === 'PROCESSES' ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            <Activity className="w-4 h-4 inline-block mr-1.5 -mt-0.5" /> Process View
+          </button>
         </div>
       </div>
 
@@ -336,11 +393,23 @@ export default function Scheduler() {
                     <button 
                       onClick={() => {
                         setScheduleModalPhase(task);
-                        if (task.resources && task.resources.length > 0 && task.resources[0].machineId) {
-                          setSelectedMachineId(task.resources[0].machineId);
+                        if (task.resources && task.resources.length > 0) {
+                          if (task.resources[0].machineId) setSelectedMachineId(task.resources[0].machineId);
+                          else setSelectedMachineId('');
+                          
+                          if (task.resources[0].materialId) setSelectedMaterialId(task.resources[0].materialId);
+                          else if (task.resources[0].materialsList) {
+                            try {
+                              const list = JSON.parse(task.resources[0].materialsList);
+                              if (list && list.length > 0) setSelectedMaterialId(list[0]);
+                              else setSelectedMaterialId('');
+                            } catch (e) { setSelectedMaterialId(''); }
+                          } else setSelectedMaterialId('');
                         } else {
                           setSelectedMachineId('');
+                          setSelectedMaterialId('');
                         }
+                        setStartDate(getDefaultDate());
                       }}
                       className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold uppercase tracking-wider transition-colors shadow-sm shadow-blue-500/20"
                     >
@@ -443,6 +512,30 @@ export default function Scheduler() {
                       </button>
                     </div>
                   </div>
+
+                  <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 mt-2">
+                    <h4 className="text-slate-400 font-black uppercase tracking-widest text-xs mb-4">Submit Project Update</h4>
+                    <div className="flex gap-4">
+                      <input 
+                        type="text"
+                        value={operatorNote}
+                        onChange={(e) => setOperatorNote(e.target.value)}
+                        placeholder="Type notes or updates for the admin..."
+                        className="flex-1 h-12 bg-[#0f172a] border border-slate-700 text-sm text-white rounded-xl px-4 outline-none focus:border-blue-500 transition-colors shadow-inner"
+                      />
+                      <button
+                        onClick={() => {
+                          if (operatorNote.trim()) {
+                            submitUpdateMutation.mutate({ projectId: activeBooking.phase.projectId, content: operatorNote });
+                          }
+                        }}
+                        disabled={submitUpdateMutation.isPending}
+                        className="h-12 px-6 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl font-bold uppercase tracking-wider text-sm transition-colors shrink-0 flex items-center"
+                      >
+                        <Send className="w-4 h-4 mr-2" /> Send Update
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -460,13 +553,24 @@ export default function Scheduler() {
             <p className="text-sm text-slate-500 font-bold mt-1">Horizonal tracking of upcoming shop floor load</p>
           </div>
           
-          <div className="flex items-center space-x-3 bg-slate-900 border border-slate-700 p-2 rounded-xl text-sm shadow-inner">
+          <div className="flex items-center space-x-3 bg-slate-900 border border-slate-700 p-2 rounded-xl text-sm shadow-inner flex-wrap gap-y-2">
              {timelineMachineFilter && (
                <span className="flex items-center mr-2 px-3 tracking-widest uppercase font-black text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 py-1.5 rounded-lg">
                  Filtered
                </span>
              )}
-             <label className="font-bold text-slate-400 px-2">VIEW:</label>
+             
+             <select 
+               value={timelineProjectFilter} 
+               onChange={e => setTimelineProjectFilter(e.target.value)}
+               className="bg-slate-800 border-none text-slate-200 text-sm font-bold rounded-lg px-4 py-2 outline-none focus:ring-1 focus:ring-blue-500 min-w-[200px]"
+             >
+               <option value="">All Projects</option>
+               {projects?.filter((p:any) => p.status !== 'LEAD').map((p: any) => (
+                 <option key={p.id} value={p.id}>{p.name}</option>
+               ))}
+             </select>
+
              <select 
                value={timelineMachineFilter} 
                onChange={e => setTimelineMachineFilter(e.target.value)}
@@ -502,6 +606,9 @@ export default function Scheduler() {
         .calendar-container .fc-toolbar-title { color: #f8fafc; font-weight: 900; font-size: 1.5rem !important; letter-spacing: -0.02em; }
         .calendar-container .fc-col-header-cell-cushion { color: #94a3b8; font-weight: 800; padding: 16px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
         .calendar-container .fc-daygrid-day-number { color: #64748b; font-weight: 800; padding: 8px; font-size: 0.875rem; }
+        .react-datepicker__day--highlighted-custom-red { background-color: #ef4444 !important; color: white !important; font-weight: bold; }
+        .custom-datepicker-wrapper .react-datepicker-wrapper { width: 100%; }
+        .custom-datepicker-wrapper .react-datepicker__input-container { width: 100%; }
       `}</style>
     </div>
   );

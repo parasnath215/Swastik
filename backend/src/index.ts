@@ -25,6 +25,9 @@ app.use('/api/finance', financeRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/users', userRoutes);
 
+import path from 'path';
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', time: new Date().toISOString() });
 });

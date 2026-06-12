@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -27,8 +27,29 @@ model Project {
   status     String   @default("LEAD") // LEAD, ACTIVE, COMPLETED
   phases     Phase[]
   expenses   Expense[]
+  files      ProjectFile[]
+  updates    ProjectUpdate[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+model ProjectFile {
+  id        String   @id @default(uuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  url       String
+  name      String
+  size      Int
+  createdAt DateTime @default(now())
+}
+
+model ProjectUpdate {
+  id        String   @id @default(uuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  content   String
+  operatorId String?
+  createdAt DateTime @default(now())
 }
 
 model Phase {
@@ -57,6 +78,8 @@ model PhaseResource {
   process    Process? @relation(fields: [processId], references: [id])
   materialId String?
   material   Material? @relation(fields: [materialId], references: [id])
+  materialsList String? // JSON array of material IDs
+  expectedDuration Int? // Expected duration in hours or minutes
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
