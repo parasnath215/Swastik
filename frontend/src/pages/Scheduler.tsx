@@ -84,10 +84,11 @@ export default function Scheduler() {
     activeTasks.sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
     
     return activeTasks.filter((t: any) => {
+      const isProcessPhase = t.phase?.name?.toLowerCase().includes('process');
       if (viewMode === 'MACHINES') {
-        return t.machineId != null || t.phase?.name?.toLowerCase().includes('machine');
+        return !isProcessPhase;
       } else {
-        return t.processId != null || t.phase?.name?.toLowerCase().includes('process');
+        return isProcessPhase;
       }
     });
   }, [tasks, viewMode]);
@@ -115,10 +116,11 @@ export default function Scheduler() {
     const now = new Date();
 
     return allPhases.filter(p => {
+      const isProcessPhase = p.name?.toLowerCase().includes('process');
       if (viewMode === 'MACHINES') {
-        return p.name?.toLowerCase().includes('machine') || p.resources?.some((r: any) => r.machineId);
+        return !isProcessPhase;
       } else {
-        return p.name?.toLowerCase().includes('process') || p.resources?.some((r: any) => r.processId);
+        return isProcessPhase;
       }
     }).map(p => {
       // Is there an active task booking for this specific phase?
@@ -502,7 +504,7 @@ export default function Scheduler() {
                   <CheckCircle2 className="w-10 h-10 text-slate-600" />
                 </div>
                 <h3 className="text-2xl font-black text-slate-300">No Running Tasks</h3>
-                <p className="text-slate-500 mt-2 max-w-sm">You have no active or scheduled machines. Select "Schedule Task" under your pending orders to begin processing.</p>
+                <p className="text-slate-500 mt-2 max-w-sm">You have no active or scheduled {viewMode === 'MACHINES' ? 'machines' : 'processes'}. Select "Schedule Task" under your pending orders to begin processing.</p>
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
@@ -521,7 +523,7 @@ export default function Scheduler() {
                           
                           <div>
                             <h4 className="text-blue-400 font-black uppercase tracking-widest text-[10px] mb-2 flex items-center"><span className="w-2 h-2 rounded-full bg-blue-500 mr-2 animate-pulse"></span> Primary Operations</h4>
-                            <p className="text-lg font-bold text-white leading-tight">Resource Locked & Scheduled</p>
+                            <p className="text-lg font-bold text-white leading-tight">{viewMode === 'MACHINES' ? 'Machine' : 'Process'} Locked & Scheduled</p>
                             <p className="text-xs text-slate-400 mt-1 font-medium">Currently processing on <span className="text-slate-200 font-bold">{booking.machine?.name || booking.process?.name || 'a resource'}</span>.</p>
                             <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider font-bold">Expires: {new Date(booking.endTime).toLocaleString()}</p>
                           </div>
@@ -544,7 +546,7 @@ export default function Scheduler() {
 
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
                           <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
-                            <h4 className="text-slate-400 font-black uppercase tracking-widest text-[10px] mb-3">Extend Reservation</h4>
+                            <h4 className="text-slate-400 font-black uppercase tracking-widest text-[10px] mb-3">Extend {viewMode === 'MACHINES' ? 'Machine' : 'Process'} Reservation</h4>
                             <div className="flex gap-3">
                               <div className="relative flex-1">
                                 <input 
