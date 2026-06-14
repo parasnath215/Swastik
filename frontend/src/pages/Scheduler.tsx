@@ -37,7 +37,7 @@ export default function Scheduler() {
   const [timelineProcessFilter, setTimelineProcessFilter] = useState<string>('');
   const [timelineProjectFilter, setTimelineProjectFilter] = useState<string>('');
   const [viewMode, setViewMode] = useState<'MACHINES' | 'PROCESSES'>('MACHINES');
-  const [operatorNote, setOperatorNote] = useState('');
+  const [operatorNotes, setOperatorNotes] = useState<Record<string, string>>({});
 
   // Queries
   const { data: tasks } = useQuery({ queryKey: ['tasks'], queryFn: async () => (await api.get('/scheduler/tasks')).data });
@@ -66,24 +66,31 @@ export default function Scheduler() {
     mutationFn: async ({ projectId, content }: { projectId: string, content: string }) => {
       await api.post(`/projects/${projectId}/updates`, { content });
     },
-    onSuccess: () => {
-      setOperatorNote('');
+    onSuccess: (_, variables) => {
+      setOperatorNotes(prev => ({ ...prev, [variables.projectId]: '' }));
       alert('Update submitted to Admin!');
     },
     onError: (err: any) => alert(err.response?.data?.error || 'Failed to submit update')
   });
 
-  // Calculate The Running Task (Next Upcoming or Current Task)
-  const activeBooking = useMemo(() => {
-    if (!tasks) return null;
+  // Calculate The Running Tasks
+  const activeBookings = useMemo(() => {
+    if (!tasks) return [];
     const now = new Date();
     // Find all future or currently running tasks
     const activeTasks = tasks.filter((t: any) => new Date(t.endTime) > now);
     
-    // Sort chronologically by start time, picking the earliest active
+    // Sort chronologically by start time
     activeTasks.sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-    return activeTasks.length > 0 ? activeTasks[0] : null;
-  }, [tasks]);
+    
+    return activeTasks.filter((t: any) => {
+      if (viewMode === 'MACHINES') {
+        return t.machineId != null || t.phase?.name?.toLowerCase().includes('machine');
+      } else {
+        return t.processId != null || t.phase?.name?.toLowerCase().includes('process');
+      }
+    });
+  }, [tasks, viewMode]);
 
   // Flatten phases for left navigation
   const phaseList = useMemo(() => {
@@ -107,7 +114,13 @@ export default function Scheduler() {
 
     const now = new Date();
 
-    return allPhases.map(p => {
+    return allPhases.filter(p => {
+      if (viewMode === 'MACHINES') {
+        return p.name?.toLowerCase().includes('machine') || p.resources?.some((r: any) => r.machineId);
+      } else {
+        return p.name?.toLowerCase().includes('process') || p.resources?.some((r: any) => r.processId);
+      }
+    }).map(p => {
       // Is there an active task booking for this specific phase?
       const phaseTasks = tasks?.filter((t: any) => t.phaseId === p.id) || [];
       const hasUpcomingBooking = phaseTasks.some((t: any) => new Date(t.endTime) > now);
@@ -121,7 +134,7 @@ export default function Scheduler() {
 
       return { ...p, calculatedState };
     });
-  }, [projects, tasks]);
+  }, [projects, tasks, viewMode]);
 
   const displayedTasks = phaseList.filter(p => p.calculatedState === activeTab);
 
@@ -239,33 +252,37 @@ export default function Scheduler() {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-3">
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Target Machine</label>
-                  <select 
-                    value={selectedMachineId} 
-                    onChange={e => setSelectedMachineId(e.target.value)} 
-                    className="w-full h-14 px-4 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all font-semibold appearance-none"
-                  >
-                    <option value="">-- Select Target Machine --</option>
-                    {machines?.map((m: any) => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
-                  </select>
-                </div>
+                {viewMode === 'MACHINES' && (
+                  <div className="space-y-3">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Target Machine</label>
+                    <select 
+                      value={selectedMachineId} 
+                      onChange={e => setSelectedMachineId(e.target.value)} 
+                      className="w-full h-14 px-4 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all font-semibold appearance-none"
+                    >
+                      <option value="">-- Select Target Machine --</option>
+                      {machines?.map((m: any) => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
-                <div className="space-y-3">
-                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Target Process</label>
-                  <select 
-                    value={selectedProcessId} 
-                    onChange={e => setSelectedProcessId(e.target.value)} 
-                    className="w-full h-14 px-4 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all font-semibold appearance-none"
-                  >
-                    <option value="">-- Select Target Process --</option>
-                    {processes?.map((p: any) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
+                {viewMode === 'PROCESSES' && (
+                  <div className="space-y-3">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Target Process</label>
+                    <select 
+                      value={selectedProcessId} 
+                      onChange={e => setSelectedProcessId(e.target.value)} 
+                      className="w-full h-14 px-4 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all font-semibold appearance-none"
+                    >
+                      <option value="">-- Select Target Process --</option>
+                      {processes?.map((p: any) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="space-y-3 md:col-span-2">
                   <label className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Target Material</label>
@@ -474,12 +491,12 @@ export default function Scheduler() {
         {/* RIGHT COLUMN: ACTIVE WORKSPACE / FORM */}
         <div className="flex-1">
           <h2 className="text-sm font-black text-slate-500 uppercase tracking-widest pl-2 flex items-center mb-4">
-            <Zap className="w-4 h-4 mr-2 text-amber-500" /> Current Dashboard Focus
+            <Zap className="w-4 h-4 mr-2 text-amber-500" /> Current Dashboard Focus ({activeBookings.length})
           </h2>
           
           <div className="bg-[#0f172a] border border-slate-800 rounded-3xl overflow-hidden shadow-2xl min-h-[600px] flex flex-col relative h-[calc(100%-2rem)]">
             
-            {!activeBooking ? (
+            {activeBookings.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center p-10 text-center bg-gradient-to-b from-slate-900/50 to-transparent">
                 <div className="w-24 h-24 rounded-full bg-slate-800/50 border border-slate-700 flex items-center justify-center mb-6 shadow-inner">
                   <CheckCircle2 className="w-10 h-10 text-slate-600" />
@@ -488,94 +505,102 @@ export default function Scheduler() {
                 <p className="text-slate-500 mt-2 max-w-sm">You have no active or scheduled machines. Select "Schedule Task" under your pending orders to begin processing.</p>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col animate-in fade-in duration-500">
-                {/* Active Focus Header */}
-                <div className="bg-gradient-to-r from-blue-900/40 to-[#0f172a] p-8 border-b border-slate-800 relative overflow-hidden">
-                  <div className="absolute right-0 top-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[60px] pointer-events-none -mt-20 -mr-20"></div>
-                  <h3 className="text-2xl font-black text-white relative z-10">{activeBooking.phase?.project?.name}</h3>
-                  <p className="text-blue-400 font-bold uppercase tracking-wider text-sm mt-1 relative z-10">Phase {activeBooking.phase?.order}: {activeBooking.phase?.name}</p>
-                </div>
-
-                <div className="p-8 flex-1 flex flex-col gap-6">
-                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-6 relative overflow-hidden flex flex-col md:flex-row gap-6 md:items-center justify-between">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/20 rounded-full blur-[40px] pointer-events-none -mt-10 -mr-10"></div>
-                    
-                    <div>
-                      <h4 className="text-blue-400 font-black uppercase tracking-widest text-[10px] mb-2 flex items-center"><span className="w-2 h-2 rounded-full bg-blue-500 mr-2 animate-pulse"></span> Primary Operations</h4>
-                      <p className="text-2xl font-bold text-white leading-tight">Resource Locked & Scheduled</p>
-                      <p className="text-sm text-slate-400 mt-2 font-medium">Currently processing on <span className="text-slate-200 font-bold">{activeBooking.machine?.name || activeBooking.process?.name || 'a resource'}</span>.</p>
-                      <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider font-bold">Expires: {new Date(activeBooking.endTime).toLocaleString()}</p>
-                    </div>
-
-                    <div className="flex flex-col gap-3 shrink-0">
-                       <button 
-                         onClick={() => {
-                           if (confirm('Are you sure you want to finish this task early? The machine will be freed up immediately.')) {
-                             api.patch(`/scheduler/tasks/${activeBooking.id}`, { action: 'finish_early' })
-                               .then(() => queryClient.invalidateQueries({ queryKey: ['tasks'] }))
-                               .catch(err => alert(err.response?.data?.error || 'Failed to update'));
-                           }
-                         }}
-                         className="px-6 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-xl font-bold text-sm tracking-wider uppercase transition-colors"
-                       >
-                         Finish Early
-                       </button>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 mt-2">
-                    <h4 className="text-slate-400 font-black uppercase tracking-widest text-xs mb-4">Extend Machine Reservation</h4>
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      <div className="relative flex-1">
-                        <input 
-                          id={`extend-${activeBooking.id}`}
-                          type="number" 
-                          min="1"
-                          defaultValue="10"
-                          className="w-full h-14 pl-4 pr-16 bg-[#0f172a] border border-slate-700 text-xl font-bold text-white rounded-xl outline-none focus:border-blue-500 transition-colors shadow-inner" 
-                        />
-                        <span className="absolute right-4 top-0 bottom-0 flex items-center text-slate-500 font-bold uppercase tracking-wider text-xs pointer-events-none">HRS</span>
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                <div className="grid grid-cols-1 gap-6">
+                  {activeBookings.map((booking: any) => (
+                    <div key={booking.id} className="animate-in fade-in duration-500 bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-lg flex flex-col">
+                      <div className="bg-gradient-to-r from-blue-900/40 to-[#0f172a] p-6 border-b border-slate-800 relative overflow-hidden">
+                        <div className="absolute right-0 top-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[60px] pointer-events-none -mt-20 -mr-20"></div>
+                        <h3 className="text-xl font-black text-white relative z-10">{booking.phase?.project?.name}</h3>
+                        <p className="text-blue-400 font-bold uppercase tracking-wider text-xs mt-1 relative z-10">Phase {booking.phase?.order}: {booking.phase?.name}</p>
                       </div>
-                      <button
-                        onClick={() => {
-                          const input = document.getElementById(`extend-${activeBooking.id}`) as HTMLInputElement;
-                          const hrs = parseInt(input.value);
-                          if (hrs > 0) {
-                            api.patch(`/scheduler/tasks/${activeBooking.id}`, { action: 'add_hours', hours: hrs })
-                               .then(() => queryClient.invalidateQueries({ queryKey: ['tasks'] }))
-                               .catch(err => alert(err.response?.data?.error || 'Failed to update'));
-                          }
-                        }}
-                        className="h-14 px-8 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl font-bold uppercase tracking-wider text-sm transition-colors shrink-0"
-                      >
-                        + Add Hours
-                      </button>
-                    </div>
-                  </div>
 
-                  <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 mt-2">
-                    <h4 className="text-slate-400 font-black uppercase tracking-widest text-xs mb-4">Submit Project Update</h4>
-                    <div className="flex gap-4">
-                      <input 
-                        type="text"
-                        value={operatorNote}
-                        onChange={(e) => setOperatorNote(e.target.value)}
-                        placeholder="Type notes or updates for the admin..."
-                        className="flex-1 h-12 bg-[#0f172a] border border-slate-700 text-sm text-white rounded-xl px-4 outline-none focus:border-blue-500 transition-colors shadow-inner"
-                      />
-                      <button
-                        onClick={() => {
-                          if (operatorNote.trim()) {
-                            submitUpdateMutation.mutate({ projectId: activeBooking.phase.projectId, content: operatorNote });
-                          }
-                        }}
-                        disabled={submitUpdateMutation.isPending}
-                        className="h-12 px-6 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl font-bold uppercase tracking-wider text-sm transition-colors shrink-0 flex items-center"
-                      >
-                        <Send className="w-4 h-4 mr-2" /> Send Update
-                      </button>
+                      <div className="p-6 flex-1 flex flex-col gap-5">
+                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-5 relative overflow-hidden flex flex-col lg:flex-row gap-5 lg:items-center justify-between">
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/20 rounded-full blur-[40px] pointer-events-none -mt-10 -mr-10"></div>
+                          
+                          <div>
+                            <h4 className="text-blue-400 font-black uppercase tracking-widest text-[10px] mb-2 flex items-center"><span className="w-2 h-2 rounded-full bg-blue-500 mr-2 animate-pulse"></span> Primary Operations</h4>
+                            <p className="text-lg font-bold text-white leading-tight">Resource Locked & Scheduled</p>
+                            <p className="text-xs text-slate-400 mt-1 font-medium">Currently processing on <span className="text-slate-200 font-bold">{booking.machine?.name || booking.process?.name || 'a resource'}</span>.</p>
+                            <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider font-bold">Expires: {new Date(booking.endTime).toLocaleString()}</p>
+                          </div>
+
+                          <div className="flex flex-col gap-2 shrink-0">
+                             <button 
+                               onClick={() => {
+                                 if (confirm('Are you sure you want to finish this task early? The resource will be freed up immediately.')) {
+                                   api.patch(`/scheduler/tasks/${booking.id}`, { action: 'finish_early' })
+                                     .then(() => queryClient.invalidateQueries({ queryKey: ['tasks'] }))
+                                     .catch(err => alert(err.response?.data?.error || 'Failed to update'));
+                                 }
+                               }}
+                               className="px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-lg font-bold text-xs tracking-wider uppercase transition-colors"
+                             >
+                               Finish Early
+                             </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
+                            <h4 className="text-slate-400 font-black uppercase tracking-widest text-[10px] mb-3">Extend Reservation</h4>
+                            <div className="flex gap-3">
+                              <div className="relative flex-1">
+                                <input 
+                                  id={`extend-${booking.id}`}
+                                  type="number" 
+                                  min="1"
+                                  defaultValue="10"
+                                  className="w-full h-10 pl-3 pr-12 bg-[#0f172a] border border-slate-700 text-sm font-bold text-white rounded-lg outline-none focus:border-blue-500 transition-colors shadow-inner" 
+                                />
+                                <span className="absolute right-3 top-0 bottom-0 flex items-center text-slate-500 font-bold uppercase tracking-wider text-[10px] pointer-events-none">HRS</span>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const input = document.getElementById(`extend-${booking.id}`) as HTMLInputElement;
+                                  const hrs = parseInt(input.value);
+                                  if (hrs > 0) {
+                                    api.patch(`/scheduler/tasks/${booking.id}`, { action: 'add_hours', hours: hrs })
+                                       .then(() => queryClient.invalidateQueries({ queryKey: ['tasks'] }))
+                                       .catch(err => alert(err.response?.data?.error || 'Failed to update'));
+                                  }
+                                }}
+                                className="h-10 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg font-bold uppercase tracking-wider text-[10px] transition-colors shrink-0"
+                              >
+                                + Add
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5">
+                            <h4 className="text-slate-400 font-black uppercase tracking-widest text-[10px] mb-3">Submit Project Update</h4>
+                            <div className="flex gap-3">
+                              <input 
+                                type="text"
+                                value={operatorNotes[booking.phase.projectId] || ''}
+                                onChange={(e) => setOperatorNotes(prev => ({ ...prev, [booking.phase.projectId]: e.target.value }))}
+                                placeholder="Type updates..."
+                                className="flex-1 h-10 bg-[#0f172a] border border-slate-700 text-xs text-white rounded-lg px-3 outline-none focus:border-blue-500 transition-colors shadow-inner"
+                              />
+                              <button
+                                onClick={() => {
+                                  const note = operatorNotes[booking.phase.projectId];
+                                  if (note?.trim()) {
+                                    submitUpdateMutation.mutate({ projectId: booking.phase.projectId, content: note });
+                                  }
+                                }}
+                                disabled={submitUpdateMutation.isPending}
+                                className="h-10 px-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg font-bold uppercase tracking-wider text-[10px] transition-colors shrink-0 flex items-center"
+                              >
+                                <Send className="w-3 h-3 mr-1.5" /> Send
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             )}
