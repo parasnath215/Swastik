@@ -30,9 +30,11 @@ export default function Scheduler() {
   const [runtimeHours, setRuntimeHours] = useState<number>(24);
   const [startDate, setStartDate] = useState<Date>(getDefaultDate());
   const [selectedMachineId, setSelectedMachineId] = useState<string>('');
+  const [selectedProcessId, setSelectedProcessId] = useState<string>('');
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
   const [conflictError, setConflictError] = useState<string | null>(null);
   const [timelineMachineFilter, setTimelineMachineFilter] = useState<string>('');
+  const [timelineProcessFilter, setTimelineProcessFilter] = useState<string>('');
   const [timelineProjectFilter, setTimelineProjectFilter] = useState<string>('');
   const [viewMode, setViewMode] = useState<'MACHINES' | 'PROCESSES'>('MACHINES');
   const [operatorNote, setOperatorNote] = useState('');
@@ -41,6 +43,7 @@ export default function Scheduler() {
   const { data: tasks } = useQuery({ queryKey: ['tasks'], queryFn: async () => (await api.get('/scheduler/tasks')).data });
   const { data: projects } = useQuery({ queryKey: ['projects'], queryFn: async () => (await api.get('/projects')).data });
   const { data: machines } = useQuery({ queryKey: ['machines'], queryFn: async () => (await api.get('/resources/machines')).data });
+  const { data: processes } = useQuery({ queryKey: ['processes'], queryFn: async () => (await api.get('/resources/processes')).data });
   const { data: materials } = useQuery({ queryKey: ['materials'], queryFn: async () => (await api.get('/resources/materials')).data });
 
   // Mutation
@@ -127,8 +130,8 @@ export default function Scheduler() {
     e.preventDefault();
     setConflictError(null);
 
-    if (!selectedMachineId || !startDate || !runtimeHours || !scheduleModalPhase) {
-      setConflictError("Please fill all required fields.");
+    if ((!selectedMachineId && !selectedProcessId) || !startDate || !runtimeHours || !scheduleModalPhase) {
+      setConflictError("Please fill all required fields. You must select at least a Machine or a Process.");
       return;
     }
 
@@ -137,30 +140,41 @@ export default function Scheduler() {
 
     if (tasks) {
       const isConflict = tasks.some((existingTask: any) => {
-        if (existingTask.machineId !== selectedMachineId) return false;
+        let isResourceConflict = false;
+        if (selectedMachineId && existingTask.machineId === selectedMachineId) isResourceConflict = true;
+        if (selectedProcessId && existingTask.processId === selectedProcessId) isResourceConflict = true;
+        if (!isResourceConflict) return false;
+
         const eStart = new Date(existingTask.startTime).getTime();
         const eEnd = new Date(existingTask.endTime).getTime();
         return (start < eEnd && end > eStart);
       });
 
       if (isConflict) {
-        setConflictError("MACHINE UNAVAILABLE: This machine is already booked during the selected timeframe.");
+        setConflictError("RESOURCE UNAVAILABLE: This machine or process is already booked during the selected timeframe.");
         return;
       }
     }
 
     scheduleMutation.mutate({
       phaseId: scheduleModalPhase.id,
-      machineId: selectedMachineId,
-      materialId: selectedMaterialId,
+      machineId: selectedMachineId || null,
+      processId: selectedProcessId || null,
+      materialId: selectedMaterialId || null,
       startTime: startDate.toISOString(),
       duration: runtimeHours * 60 
     });
   };
 
   const getOccupiedDates = () => {
-    if (!tasks || !selectedMachineId) return [];
-    return tasks.filter((t: any) => t.machineId === selectedMachineId).map((t: any) => new Date(t.startTime));
+    if (!tasks) return [];
+    if (!selectedMachineId && !selectedProcessId) return [];
+    return tasks.filter((t: any) => {
+      let isMatch = false;
+      if (selectedMachineId && t.machineId === selectedMachineId) isMatch = true;
+      if (selectedProcessId && t.processId === selectedProcessId) isMatch = true;
+      return isMatch;
+    }).map((t: any) => new Date(t.startTime));
   };
 
   // Timeline Prep
@@ -172,11 +186,21 @@ export default function Scheduler() {
   };
 
   const timelineEvents = tasks?.filter((t: any) => {
-    if (timelineMachineFilter && t.machineId !== timelineMachineFilter) return false;
     if (timelineProjectFilter && t.phase?.projectId !== timelineProjectFilter) return false;
-    return true;
+    
+    if (viewMode === 'MACHINES') {
+      if (!t.machineId) return false;
+      if (timelineMachineFilter && t.machineId !== timelineMachineFilter) return false;
+      return true;
+    } else {
+      if (!t.processId) return false;
+      if (timelineProcessFilter && t.processId !== timelineProcessFilter) return false;
+      return true;
+    }
   }).map((t: any) => {
-    const bgColor = t.machineId ? getStringColor(t.machineId) : '#3b82f6';
+    const bgColor = viewMode === 'MACHINES' 
+      ? getStringColor(t.machineId) 
+      : getStringColor(t.processId);
     return {
       id: t.id,
       title: `${t.phase?.project?.name} - P${t.phase?.order}`,
@@ -202,7 +226,7 @@ export default function Scheduler() {
             </button>
 
             <div className="bg-gradient-to-r from-blue-900/40 to-[#0f172a] p-8 border-b border-slate-800">
-              <h3 className="text-2xl font-black text-white">Book Machine</h3>
+              <h3 className="text-2xl font-black text-white">Book Machine or Process</h3>
               <p className="text-blue-400 font-bold uppercase tracking-wider text-sm mt-1">{scheduleModalPhase.projectName} - Phase {scheduleModalPhase.order}</p>
             </div>
 
@@ -218,12 +242,11 @@ export default function Scheduler() {
                 <div className="space-y-3">
                   <label className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Target Machine</label>
                   <select 
-                    required 
                     value={selectedMachineId} 
                     onChange={e => setSelectedMachineId(e.target.value)} 
                     className="w-full h-14 px-4 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all font-semibold appearance-none"
                   >
-                    <option value="">-- Select Required Machine --</option>
+                    <option value="">-- Select Target Machine --</option>
                     {machines?.map((m: any) => (
                       <option key={m.id} value={m.id}>{m.name}</option>
                     ))}
@@ -231,9 +254,22 @@ export default function Scheduler() {
                 </div>
 
                 <div className="space-y-3">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Target Process</label>
+                  <select 
+                    value={selectedProcessId} 
+                    onChange={e => setSelectedProcessId(e.target.value)} 
+                    className="w-full h-14 px-4 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all font-semibold appearance-none"
+                  >
+                    <option value="">-- Select Target Process --</option>
+                    {processes?.map((p: any) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-3 md:col-span-2">
                   <label className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Target Material</label>
                   <select 
-                    required 
                     value={selectedMaterialId} 
                     onChange={e => setSelectedMaterialId(e.target.value)} 
                     className="w-full h-14 px-4 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all font-semibold appearance-none"
@@ -306,7 +342,7 @@ export default function Scheduler() {
                   disabled={scheduleMutation.isPending}
                   className="w-full h-16 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-lg font-black uppercase tracking-widest shadow-[0_0_30px_rgba(37,99,235,0.3)] transition-all active:scale-[0.98] disabled:opacity-50"
                 >
-                  {scheduleMutation.isPending ? 'Processing...' : 'Confirm Book Machine'}
+                  {scheduleMutation.isPending ? 'Processing...' : 'Confirm Booking'}
                 </button>
               </div>
             </form>
@@ -397,6 +433,9 @@ export default function Scheduler() {
                           if (task.resources[0].machineId) setSelectedMachineId(task.resources[0].machineId);
                           else setSelectedMachineId('');
                           
+                          if (task.resources[0].processId) setSelectedProcessId(task.resources[0].processId);
+                          else setSelectedProcessId('');
+                          
                           if (task.resources[0].materialId) setSelectedMaterialId(task.resources[0].materialId);
                           else if (task.resources[0].materialsList) {
                             try {
@@ -407,6 +446,7 @@ export default function Scheduler() {
                           } else setSelectedMaterialId('');
                         } else {
                           setSelectedMachineId('');
+                          setSelectedProcessId('');
                           setSelectedMaterialId('');
                         }
                         setStartDate(getDefaultDate());
@@ -462,8 +502,8 @@ export default function Scheduler() {
                     
                     <div>
                       <h4 className="text-blue-400 font-black uppercase tracking-widest text-[10px] mb-2 flex items-center"><span className="w-2 h-2 rounded-full bg-blue-500 mr-2 animate-pulse"></span> Primary Operations</h4>
-                      <p className="text-2xl font-bold text-white leading-tight">Machine Locked & Scheduled</p>
-                      <p className="text-sm text-slate-400 mt-2 font-medium">Currently processing on <span className="text-slate-200 font-bold">{activeBooking.machine?.name || 'a machine'}</span>.</p>
+                      <p className="text-2xl font-bold text-white leading-tight">Resource Locked & Scheduled</p>
+                      <p className="text-sm text-slate-400 mt-2 font-medium">Currently processing on <span className="text-slate-200 font-bold">{activeBooking.machine?.name || activeBooking.process?.name || 'a resource'}</span>.</p>
                       <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider font-bold">Expires: {new Date(activeBooking.endTime).toLocaleString()}</p>
                     </div>
 
@@ -548,13 +588,13 @@ export default function Scheduler() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
             <h3 className="text-xl font-black text-slate-200 flex items-center tracking-tight">
-              <Calendar className="w-5 h-5 mr-3 text-blue-500" /> Machine Allocation Gantt
+              <Calendar className="w-5 h-5 mr-3 text-blue-500" /> {viewMode === 'MACHINES' ? 'Machine Allocation Gantt' : 'Process Allocation Gantt'}
             </h3>
-            <p className="text-sm text-slate-500 font-bold mt-1">Horizonal tracking of upcoming shop floor load</p>
+            <p className="text-sm text-slate-500 font-bold mt-1">Horizontal tracking of upcoming shop floor load</p>
           </div>
           
           <div className="flex items-center space-x-3 bg-slate-900 border border-slate-700 p-2 rounded-xl text-sm shadow-inner flex-wrap gap-y-2">
-             {timelineMachineFilter && (
+             {(timelineMachineFilter || timelineProcessFilter) && (
                <span className="flex items-center mr-2 px-3 tracking-widest uppercase font-black text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 py-1.5 rounded-lg">
                  Filtered
                </span>
@@ -571,16 +611,29 @@ export default function Scheduler() {
                ))}
              </select>
 
-             <select 
-               value={timelineMachineFilter} 
-               onChange={e => setTimelineMachineFilter(e.target.value)}
-               className="bg-slate-800 border-none text-slate-200 text-sm font-bold rounded-lg px-4 py-2 outline-none focus:ring-1 focus:ring-blue-500 min-w-[200px]"
-             >
-               <option value="">All Machines Master List</option>
-               {machines?.map((m: any) => (
-                 <option key={m.id} value={m.id}>{m.name}</option>
-               ))}
-             </select>
+             {viewMode === 'MACHINES' ? (
+               <select 
+                 value={timelineMachineFilter} 
+                 onChange={e => setTimelineMachineFilter(e.target.value)}
+                 className="bg-slate-800 border-none text-slate-200 text-sm font-bold rounded-lg px-4 py-2 outline-none focus:ring-1 focus:ring-blue-500 min-w-[200px]"
+               >
+                 <option value="">All Machines Master List</option>
+                 {machines?.map((m: any) => (
+                   <option key={m.id} value={m.id}>{m.name}</option>
+                 ))}
+               </select>
+             ) : (
+               <select 
+                 value={timelineProcessFilter} 
+                 onChange={e => setTimelineProcessFilter(e.target.value)}
+                 className="bg-slate-800 border-none text-slate-200 text-sm font-bold rounded-lg px-4 py-2 outline-none focus:ring-1 focus:ring-blue-500 min-w-[200px]"
+               >
+                 <option value="">All Processes Master List</option>
+                 {processes?.map((p: any) => (
+                   <option key={p.id} value={p.id}>{p.name}</option>
+                 ))}
+               </select>
+             )}
           </div>
         </div>
 
