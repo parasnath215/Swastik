@@ -80,6 +80,7 @@ model PhaseResource {
   material   Material? @relation(fields: [materialId], references: [id])
   materialsList String? // JSON array of material IDs
   expectedDuration Int? // Expected duration in hours or minutes
+  order      Int      @default(0)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }

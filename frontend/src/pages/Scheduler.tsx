@@ -463,10 +463,17 @@ export default function Scheduler() {
                               else setSelectedMaterialId('');
                             } catch (e) { setSelectedMaterialId(''); }
                           } else setSelectedMaterialId('');
+
+                          if (task.resources[0].expectedDuration) {
+                            setRuntimeHours(task.resources[0].expectedDuration);
+                          } else {
+                            setRuntimeHours(24);
+                          }
                         } else {
                           setSelectedMachineId('');
                           setSelectedProcessId('');
                           setSelectedMaterialId('');
+                          setRuntimeHours(24);
                         }
                         setStartDate(getDefaultDate());
                       }}

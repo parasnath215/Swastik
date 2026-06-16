@@ -54,6 +54,21 @@ router.post('/schedule', authorizeRoles('SUPER_ADMIN', 'ADMIN', 'OPERATOR'), asy
       }
     });
 
+    // Sync expected duration back to the PhaseResource
+    const durationInHours = Math.round(parseInt(duration) / 60);
+    await prisma.phaseResource.updateMany({
+      where: {
+        phaseId,
+        OR: [
+          { machineId },
+          { processId: processId || null }
+        ]
+      },
+      data: {
+        expectedDuration: durationInHours
+      }
+    });
+
     res.status(201).json(task);
   } catch (error) {
     res.status(500).json({ error: 'Scheduling failed' });
@@ -96,6 +111,21 @@ router.patch('/tasks/:id', authorizeRoles('SUPER_ADMIN', 'ADMIN', 'OPERATOR'), a
     const updatedTask = await prisma.task.update({
       where: { id: req.params.id as string },
       data: { endTime: newEndTime, duration: newDuration, actualCost }
+    });
+
+    // Sync expected duration back to matching PhaseResources
+    const newDurationInHours = Math.round(newDuration / 60);
+    await prisma.phaseResource.updateMany({
+      where: {
+        phaseId: updatedTask.phaseId,
+        OR: [
+          { machineId: updatedTask.machineId },
+          { processId: updatedTask.processId }
+        ]
+      },
+      data: {
+        expectedDuration: newDurationInHours
+      }
     });
 
     res.json(updatedTask);

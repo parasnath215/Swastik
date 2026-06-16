@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { CheckCircle, AlertCircle, Trash2, Settings, Wrench, Box, Plus, ChevronDown, ChevronRight, Play, Edit2, Check, X, Clock, MessageSquare } from 'lucide-react';
+import { CheckCircle, AlertCircle, Trash2, Settings, Wrench, Box, Plus, ChevronDown, ChevronRight, Play, Edit2, Check, X, Clock, MessageSquare, ChevronUp } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import CreatableSelect from 'react-select/creatable';
 
@@ -13,6 +13,43 @@ export default function PhaseManager() {
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editProjectName, setEditProjectName] = useState<string>('');
+  const [insertingAfterPhaseId, setInsertingAfterPhaseId] = useState<string | null>(null);
+  const [insertPhaseName, setInsertPhaseName] = useState<string>('');
+  const [localDurations, setLocalDurations] = useState<Record<string, string>>({});
+
+  const movePhase = (phaseId: string, direction: 'up' | 'down', phaseList: any[]) => {
+    const sortedPhases = [...phaseList].sort((a, b) => a.order - b.order);
+    const index = sortedPhases.findIndex(p => p.id === phaseId);
+    if (index === -1) return;
+
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= sortedPhases.length) return;
+
+    const newPhases = [...sortedPhases];
+    const temp = newPhases[index];
+    newPhases[index] = newPhases[targetIndex];
+    newPhases[targetIndex] = temp;
+
+    const phaseIds = newPhases.map(p => p.id);
+    reorderPhases.mutate({ projectId: selectedProjectId!, phaseIds });
+  };
+
+  const moveResource = (resId: string, direction: 'up' | 'down', resources: any[]) => {
+    const sortedRes = [...resources].sort((a, b) => a.order - b.order);
+    const index = sortedRes.findIndex(r => r.id === resId);
+    if (index === -1) return;
+
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= sortedRes.length) return;
+
+    const newResList = [...sortedRes];
+    const temp = newResList[index];
+    newResList[index] = newResList[targetIndex];
+    newResList[targetIndex] = temp;
+
+    const resourceIds = newResList.map(r => r.id);
+    reorderResources.mutate({ phaseId: selectedPhaseId!, resourceIds });
+  };
 
   const { data: projects, isLoading } = useQuery({
     queryKey: ['projects'],
@@ -63,8 +100,8 @@ export default function PhaseManager() {
   });
 
   const addResource = useMutation({
-    mutationFn: async ({ phaseId }: { phaseId: string }) => {
-      await api.post(`/phases/${phaseId}/resources`, {});
+    mutationFn: async ({ phaseId, order }: { phaseId: string; order?: number }) => {
+      await api.post(`/phases/${phaseId}/resources`, { order });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
     onError: (err: any) => alert(err.response?.data?.error || 'Failed to add row')
@@ -97,6 +134,33 @@ export default function PhaseManager() {
     onError: (err: any) => {
       alert(err.response?.data?.error || 'Failed to create phase');
     }
+  });
+
+  const reorderPhases = useMutation({
+    mutationFn: async ({ projectId: _projectId, phaseIds }: { projectId: string; phaseIds: string[] }) => {
+      await api.patch('/phases/reorder', { phaseIds });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
+    onError: (err: any) => alert(err.response?.data?.error || 'Failed to reorder phases')
+  });
+
+  const deletePhase = useMutation({
+    mutationFn: async (phaseId: string) => {
+      await api.delete(`/phases/${phaseId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      setSelectedPhaseId(null);
+    },
+    onError: (err: any) => alert(err.response?.data?.error || 'Failed to delete phase')
+  });
+
+  const reorderResources = useMutation({
+    mutationFn: async ({ phaseId, resourceIds }: { phaseId: string; resourceIds: string[] }) => {
+      await api.patch(`/phases/${phaseId}/resources/reorder`, { resourceIds });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
+    onError: (err: any) => alert(err.response?.data?.error || 'Failed to reorder resource rows')
   });
 
   const deleteProject = useMutation({
@@ -270,39 +334,142 @@ export default function PhaseManager() {
                       <div className="absolute left-[45px] top-[85px] bottom-10 w-0.5 bg-slate-800 z-0 hidden lg:block"></div>
 
                       <div className="space-y-2 relative z-10 flex-1 overflow-y-auto pr-2 custom-scrollbar max-h-[400px]">
-                        {(activeProject.phases ? [...activeProject.phases] : []).sort((a:any,b:any) => a.order - b.order).map((phase: any) => {
-                          const isActive = phase.status === 'IN_PROGRESS';
-                          const isAccepted = phase.status === 'ACCEPTED';
-                          const isSelected = selectedPhaseId === phase.id;
+                        {(() => {
+                          const sortedPhases = (activeProject.phases ? [...activeProject.phases] : []).sort((a: any, b: any) => a.order - b.order);
+                          return sortedPhases.map((phase: any, index: number) => {
+                            const isActive = phase.status === 'IN_PROGRESS';
+                            const isAccepted = phase.status === 'ACCEPTED';
+                            const isSelected = selectedPhaseId === phase.id;
 
-                          return (
-                            <div 
-                              key={phase.id} 
-                              onClick={() => setSelectedPhaseId(phase.id)}
-                              className={`flex items-start cursor-pointer group transition-all duration-300 p-3 rounded-xl relative ${isSelected ? 'bg-slate-800/80 shadow-lg border border-slate-700/50' : 'hover:bg-slate-800/40 border border-transparent'}`}
-                            >
-                              <div className="relative justify-center items-center w-10 h-10 mr-4 shrink-0 -ml-1 hidden lg:flex">
-                                 {isActive && (
-                                   <span className="absolute w-6 h-6 bg-teal-400/30 rounded-full animate-[ping_2s_cubic-bezier(0,0,0.2,1)_infinite]"></span>
-                                 )}
-                                 <div className={`w-4 h-4 rounded-full z-10 border-[3px] transition-all duration-500 ${
-                                   isAccepted ? 'bg-teal-400 border-teal-400 shadow-[0_0_12px_rgba(45,212,191,0.6)]' :
-                                   isActive ? 'bg-[#0f172a] border-teal-400 ring-4 ring-teal-400/10' :
-                                   'bg-slate-800 border-slate-600 group-hover:border-slate-400'
-                                 }`}></div>
+                            return (
+                              <div key={phase.id}>
+                                <div 
+                                  onClick={() => setSelectedPhaseId(phase.id)}
+                                  className={`flex items-start cursor-pointer group transition-all duration-300 p-3 rounded-xl relative ${isSelected ? 'bg-slate-800/80 shadow-lg border border-slate-700/50' : 'hover:bg-slate-800/40 border border-transparent'}`}
+                                >
+                                  <div className="relative justify-center items-center w-10 h-10 mr-4 shrink-0 -ml-1 hidden lg:flex">
+                                     {isActive && (
+                                       <span className="absolute w-6 h-6 bg-teal-400/30 rounded-full animate-[ping_2s_cubic-bezier(0,0,0.2,1)_infinite]"></span>
+                                     )}
+                                     <div className={`w-4 h-4 rounded-full z-10 border-[3px] transition-all duration-500 ${
+                                       isAccepted ? 'bg-teal-400 border-teal-400 shadow-[0_0_12px_rgba(45,212,191,0.6)]' :
+                                       isActive ? 'bg-[#0f172a] border-teal-400 ring-4 ring-teal-400/10' :
+                                       'bg-slate-800 border-slate-600 group-hover:border-slate-400'
+                                     }`}></div>
+                                  </div>
+                                  
+                                  <div className="flex-1 pt-1 flex justify-between items-center min-w-0">
+                                    <div className="min-w-0">
+                                      <h4 className={`text-sm font-bold transition-colors mb-0.5 ${isSelected ? 'text-white' : 'text-slate-300 group-hover:text-white'} truncate`}>
+                                         Phase {phase.order}: {phase.name}
+                                      </h4>
+                                      <p className={`text-[10px] font-black uppercase tracking-widest ${
+                                         isAccepted ? 'text-teal-500' :
+                                         isActive ? 'text-blue-400' : 'text-slate-500'
+                                      }`}>{phase.status.replace('_', ' ')}</p>
+                                    </div>
+
+                                    {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
+                                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-20 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
+                                        <button
+                                          disabled={index === 0}
+                                          onClick={() => movePhase(phase.id, 'up', activeProject.phases)}
+                                          className="p-1 text-slate-500 hover:text-teal-400 disabled:opacity-30 disabled:hover:text-slate-500 rounded"
+                                          title="Move Up"
+                                        >
+                                          <ChevronUp className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          disabled={index === sortedPhases.length - 1}
+                                          onClick={() => movePhase(phase.id, 'down', activeProject.phases)}
+                                          className="p-1 text-slate-500 hover:text-teal-400 disabled:opacity-30 disabled:hover:text-slate-500 rounded"
+                                          title="Move Down"
+                                        >
+                                          <ChevronDown className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            if (confirm(`Are you sure you want to delete Phase ${phase.order}: ${phase.name}? All tasks and expenses in this phase will be lost.`)) {
+                                              deletePhase.mutate(phase.id);
+                                            }
+                                          }}
+                                          className="p-1 text-slate-500 hover:text-red-400 rounded"
+                                          title="Delete Phase"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* In-between phase insert indicator */}
+                                {index < sortedPhases.length - 1 && (user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
+                                  <div className="relative h-6 flex items-center justify-center lg:justify-start lg:pl-[43px] group/insert my-1">
+                                    <div className="absolute left-[45px] top-0 bottom-0 w-0.5 bg-slate-800 group-hover/insert:bg-teal-500/50 z-0 transition-colors hidden lg:block"></div>
+                                    
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setInsertingAfterPhaseId(phase.id);
+                                        setInsertPhaseName('');
+                                      }}
+                                      className="relative z-10 w-5 h-5 rounded-full bg-slate-900 border border-slate-800 hover:border-teal-500 text-slate-500 hover:text-teal-400 flex items-center justify-center hover:scale-110 transition-all shadow-md"
+                                      title="Insert phase here"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                    </button>
+                                    
+                                    {insertingAfterPhaseId === phase.id && (
+                                      <div 
+                                        className="absolute left-10 lg:left-16 z-30 bg-[#0f172a] border border-slate-700 rounded-xl p-2.5 flex gap-2 shadow-2xl items-center animate-in fade-in slide-in-from-left-2 w-56"
+                                        onClick={e => e.stopPropagation()}
+                                      >
+                                        <input
+                                          autoFocus
+                                          type="text"
+                                          placeholder="Insert phase name..."
+                                          className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white outline-none w-36 focus:border-teal-500"
+                                          value={insertPhaseName}
+                                          onChange={e => setInsertPhaseName(e.target.value)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && insertPhaseName.trim()) {
+                                              createPhase.mutate({
+                                                projectId: activeProject.id,
+                                                name: insertPhaseName.trim(),
+                                                order: phase.order + 1
+                                              });
+                                              setInsertingAfterPhaseId(null);
+                                            }
+                                            if (e.key === 'Escape') setInsertingAfterPhaseId(null);
+                                          }}
+                                        />
+                                        <button 
+                                          onClick={() => {
+                                            if (insertPhaseName.trim()) {
+                                              createPhase.mutate({
+                                                projectId: activeProject.id,
+                                                name: insertPhaseName.trim(),
+                                                order: phase.order + 1
+                                              });
+                                              setInsertingAfterPhaseId(null);
+                                            }
+                                          }}
+                                          className="p-1 text-emerald-400 hover:bg-emerald-500/20 rounded shrink-0"
+                                        >
+                                          <Check className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button onClick={() => setInsertingAfterPhaseId(null)} className="p-1 text-slate-400 hover:bg-slate-700 rounded shrink-0">
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                              <div className="flex-1 pt-1">
-                                <h4 className={`text-sm font-bold transition-colors mb-0.5 ${isSelected ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>
-                                   Phase {phase.order}: {phase.name}
-                                </h4>
-                                <p className={`text-[10px] font-black uppercase tracking-widest ${
-                                   isAccepted ? 'text-teal-500' :
-                                   isActive ? 'text-blue-400' : 'text-slate-500'
-                                }`}>{phase.status.replace('_', ' ')}</p>
-                              </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          });
+                        })()}
 
                         {/* ADD NEW PHASE INPUT */}
                         {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
@@ -463,6 +630,7 @@ export default function PhaseManager() {
                                           isMulti
                                           options={materialOptions}
                                           value={selectedMaterials}
+                                          menuPortalTarget={document.body}
                                           onChange={(newValue) => {
                                             const newIds = newValue.map((v: any) => v.value);
                                             updateResource.mutate({ resId: res.id, data: { materialsList: newIds } });
@@ -482,6 +650,7 @@ export default function PhaseManager() {
                                               minHeight: '42px',
                                             }),
                                             menu: (base) => ({ ...base, backgroundColor: '#0f172a', zIndex: 50 }),
+                                            menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                                             option: (base, state) => ({ ...base, backgroundColor: state.isFocused ? '#1e293b' : 'transparent', color: '#cbd5e1' }),
                                             multiValue: (base) => ({ ...base, backgroundColor: '#334155', borderRadius: '4px' }),
                                             multiValueLabel: (base) => ({ ...base, color: '#f8fafc' }),
@@ -495,19 +664,55 @@ export default function PhaseManager() {
                                         <input 
                                           type="number"
                                           placeholder="Hrs"
-                                          value={res.expectedDuration || ''}
-                                          onChange={(e) => updateResource.mutate({ resId: res.id, data: { expectedDuration: e.target.value ? parseInt(e.target.value) : null } })}
+                                          value={localDurations[res.id] !== undefined ? localDurations[res.id] : (res.expectedDuration || '')}
+                                          onChange={(e) => setLocalDurations({ ...localDurations, [res.id]: e.target.value })}
+                                          onBlur={() => {
+                                            const val = localDurations[res.id];
+                                            if (val !== undefined) {
+                                              updateResource.mutate({ resId: res.id, data: { expectedDuration: val ? parseInt(val) : null } });
+                                            }
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              e.currentTarget.blur();
+                                            }
+                                          }}
                                           className="w-full bg-[#1e293b] border border-slate-700/80 rounded-lg px-3 py-2.5 text-slate-200 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 font-medium transition-colors"
                                         />
                                       </td>
                                       <td className="px-6 py-4 text-center">
-                                        <button 
-                                          onClick={() => deleteResource.mutate({ resId: res.id })}
-                                          className="p-2.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all opacity-50 group-hover:opacity-100"
-                                          title="Remove row"
-                                        >
-                                          <Trash2 className="w-5 h-5" />
-                                        </button>
+                                        <div className="flex items-center justify-center gap-1">
+                                          <button 
+                                            disabled={res.order === 1 || activePhase.resources?.length <= 1}
+                                            onClick={() => moveResource(res.id, 'up', activePhase.resources)}
+                                            className="p-1.5 text-slate-500 hover:text-teal-400 disabled:opacity-30 disabled:hover:text-slate-500 rounded transition-colors"
+                                            title="Move Up"
+                                          >
+                                            <ChevronUp className="w-4 h-4" />
+                                          </button>
+                                          <button 
+                                            disabled={res.order === activePhase.resources?.length || activePhase.resources?.length <= 1}
+                                            onClick={() => moveResource(res.id, 'down', activePhase.resources)}
+                                            className="p-1.5 text-slate-500 hover:text-teal-400 disabled:opacity-30 disabled:hover:text-slate-500 rounded transition-colors"
+                                            title="Move Down"
+                                          >
+                                            <ChevronDown className="w-4 h-4" />
+                                          </button>
+                                          <button 
+                                            onClick={() => addResource.mutate({ phaseId: activePhase.id, order: res.order + 1 })}
+                                            className="p-1.5 text-slate-500 hover:text-blue-400 rounded transition-colors"
+                                            title="Insert Row Below"
+                                          >
+                                            <Plus className="w-4 h-4" />
+                                          </button>
+                                          <button 
+                                            onClick={() => deleteResource.mutate({ resId: res.id })}
+                                            className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                            title="Remove row"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </button>
+                                        </div>
                                       </td>
                                     </tr>
                                   )})}

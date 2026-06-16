@@ -35,7 +35,16 @@ router.get('/', async (req, res) => {
   try {
     const projects = await prisma.project.findMany({
       include: { 
-        phases: { include: { resources: true } },
+        phases: { 
+          include: { 
+            resources: {
+              orderBy: [
+                { order: 'asc' },
+                { createdAt: 'asc' }
+              ]
+            }
+          } 
+        },
         files: true,
         updates: { orderBy: { createdAt: 'desc' } }
       }
@@ -49,7 +58,7 @@ router.get('/', async (req, res) => {
 // Create project with file uploads
 router.post('/', authorizeRoles('SUPER_ADMIN', 'ADMIN', 'SALES'), upload.array('files'), async (req, res) => {
   try {
-    const { name, phone, address, dimensions, budget } = req.body;
+    const { name, phone, address, dimensions, budget, processId, materialId } = req.body;
     
     // Create the project first
     const project = await prisma.project.create({
@@ -63,11 +72,36 @@ router.post('/', authorizeRoles('SUPER_ADMIN', 'ADMIN', 'SALES'), upload.array('
         phases: {
           create: [
             { name: 'Machine', order: 1, status: 'PENDING' },
-            { name: 'Processes', order: 2, status: 'PENDING' }
+            { 
+              name: 'Processes', 
+              order: 2, 
+              status: 'PENDING',
+              resources: (processId || materialId) ? {
+                create: [
+                  {
+                    processId: processId || null,
+                    materialId: materialId || null,
+                    materialsList: materialId ? JSON.stringify([materialId]) : null,
+                    order: 1
+                  }
+                ]
+              } : undefined
+            }
           ]
         }
       },
-      include: { phases: { include: { resources: true } } }
+      include: { 
+        phases: { 
+          include: { 
+            resources: {
+              orderBy: [
+                { order: 'asc' },
+                { createdAt: 'asc' }
+              ]
+            }
+          } 
+        } 
+      }
     });
 
     // Handle uploaded files
@@ -88,7 +122,16 @@ router.post('/', authorizeRoles('SUPER_ADMIN', 'ADMIN', 'SALES'), upload.array('
     const updatedProject = await prisma.project.findUnique({
       where: { id: project.id },
       include: { 
-        phases: { include: { resources: true } },
+        phases: { 
+          include: { 
+            resources: {
+              orderBy: [
+                { order: 'asc' },
+                { createdAt: 'asc' }
+              ]
+            }
+          } 
+        },
         files: true 
       }
     });

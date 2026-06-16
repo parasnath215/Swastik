@@ -50,6 +50,20 @@ router.post('/schedule', (0, authMiddleware_1.authorizeRoles)('SUPER_ADMIN', 'AD
                 endTime: calculatedEnd
             }
         });
+        // Sync expected duration back to the PhaseResource
+        const durationInHours = Math.round(parseInt(duration) / 60);
+        await prisma_1.default.phaseResource.updateMany({
+            where: {
+                phaseId,
+                OR: [
+                    { machineId },
+                    { processId: processId || null }
+                ]
+            },
+            data: {
+                expectedDuration: durationInHours
+            }
+        });
         res.status(201).json(task);
     }
     catch (error) {
@@ -89,6 +103,20 @@ router.patch('/tasks/:id', (0, authMiddleware_1.authorizeRoles)('SUPER_ADMIN', '
         const updatedTask = await prisma_1.default.task.update({
             where: { id: req.params.id },
             data: { endTime: newEndTime, duration: newDuration, actualCost }
+        });
+        // Sync expected duration back to matching PhaseResources
+        const newDurationInHours = Math.round(newDuration / 60);
+        await prisma_1.default.phaseResource.updateMany({
+            where: {
+                phaseId: updatedTask.phaseId,
+                OR: [
+                    { machineId: updatedTask.machineId },
+                    { processId: updatedTask.processId }
+                ]
+            },
+            data: {
+                expectedDuration: newDurationInHours
+            }
         });
         res.json(updatedTask);
     }
