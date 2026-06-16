@@ -449,23 +449,38 @@ export default function Scheduler() {
                       onClick={() => {
                         setScheduleModalPhase(task);
                         if (task.resources && task.resources.length > 0) {
-                          if (task.resources[0].machineId) setSelectedMachineId(task.resources[0].machineId);
+                          // Find first resource row with a machineId
+                          const resWithMachine = task.resources.find((r: any) => r.machineId);
+                          if (resWithMachine) setSelectedMachineId(resWithMachine.machineId);
                           else setSelectedMachineId('');
                           
-                          if (task.resources[0].processId) setSelectedProcessId(task.resources[0].processId);
+                          // Find first resource row with a processId
+                          const resWithProcess = task.resources.find((r: any) => r.processId);
+                          if (resWithProcess) setSelectedProcessId(resWithProcess.processId);
                           else setSelectedProcessId('');
                           
-                          if (task.resources[0].materialId) setSelectedMaterialId(task.resources[0].materialId);
-                          else if (task.resources[0].materialsList) {
-                            try {
-                              const list = JSON.parse(task.resources[0].materialsList);
-                              if (list && list.length > 0) setSelectedMaterialId(list[0]);
-                              else setSelectedMaterialId('');
-                            } catch (e) { setSelectedMaterialId(''); }
-                          } else setSelectedMaterialId('');
+                          // Find first resource row with a materialId or materialsList
+                          const resWithMaterial = task.resources.find((r: any) => r.materialId || r.materialsList);
+                          if (resWithMaterial) {
+                            if (resWithMaterial.materialId) {
+                              setSelectedMaterialId(resWithMaterial.materialId);
+                            } else if (resWithMaterial.materialsList) {
+                              try {
+                                const list = JSON.parse(resWithMaterial.materialsList);
+                                if (list && list.length > 0) setSelectedMaterialId(list[0]);
+                                else setSelectedMaterialId('');
+                              } catch (e) { setSelectedMaterialId(''); }
+                            } else {
+                              setSelectedMaterialId('');
+                            }
+                          } else {
+                            setSelectedMaterialId('');
+                          }
 
-                          if (task.resources[0].expectedDuration) {
-                            setRuntimeHours(task.resources[0].expectedDuration);
+                          // Find first resource row with an expectedDuration
+                          const resWithDuration = task.resources.find((r: any) => r.expectedDuration);
+                          if (resWithDuration) {
+                            setRuntimeHours(resWithDuration.expectedDuration);
                           } else {
                             setRuntimeHours(24);
                           }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { Save, User, Phone, MapPin, Ruler, IndianRupee, FileUp, X } from 'lucide-react';
@@ -6,19 +6,12 @@ import { Save, User, Phone, MapPin, Ruler, IndianRupee, FileUp, X } from 'lucide
 export default function ProjectIntake() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    name: '', phone: '', address: '', dimensions: '', budget: '', processId: '', materialId: ''
+    name: '', phone: '', address: '', dimensions: '', budget: ''
   });
-  const [processes, setProcesses] = useState<any[]>([]);
-  const [materials, setMaterials] = useState<any[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [fileError, setFileError] = useState('');
-
-  useEffect(() => {
-    api.get('/resources/processes').then(res => setProcesses(res.data)).catch(console.error);
-    api.get('/resources/materials').then(res => setMaterials(res.data)).catch(console.error);
-  }, []);
 
   const evaluateMath = (expr: string) => {
     try {
@@ -50,7 +43,7 @@ export default function ProjectIntake() {
 
       await api.post('/projects', data);
       setSuccess('Project successfully created!');
-      setFormData({ name: '', phone: '', address: '', dimensions: '', budget: '', processId: '', materialId: '' });
+      setFormData({ name: '', phone: '', address: '', dimensions: '', budget: '' });
       setFiles([]);
       setTimeout(() => {
         setSuccess('');
@@ -144,40 +137,6 @@ export default function ProjectIntake() {
             <div className="relative">
               <IndianRupee className="absolute left-3 top-3 w-5 h-5 text-slate-500" />
               <input type="text" required name="budget" value={formData.budget} onChange={handleChange} onBlur={handleBlur} className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-white transition-all outline-none" placeholder="e.g. 50000 or 25000*2" />
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Target Process (Optional)</label>
-            <div className="relative">
-              <select 
-                name="processId" 
-                value={formData.processId} 
-                onChange={(e) => setFormData({ ...formData, processId: e.target.value })} 
-                className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-white transition-all outline-none"
-              >
-                <option value="">-- Select Process --</option>
-                {processes.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Target Material (Optional)</label>
-            <div className="relative">
-              <select 
-                name="materialId" 
-                value={formData.materialId} 
-                onChange={(e) => setFormData({ ...formData, materialId: e.target.value })} 
-                className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-white transition-all outline-none"
-              >
-                <option value="">-- Select Material --</option>
-                {materials.map(m => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </select>
             </div>
           </div>
           

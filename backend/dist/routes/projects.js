@@ -57,7 +57,7 @@ router.get('/', async (req, res) => {
 // Create project with file uploads
 router.post('/', (0, authMiddleware_1.authorizeRoles)('SUPER_ADMIN', 'ADMIN', 'SALES'), upload.array('files'), async (req, res) => {
     try {
-        const { name, phone, address, dimensions, budget, processId, materialId } = req.body;
+        const { name, phone, address, dimensions, budget } = req.body;
         // Create the project first
         const project = await prisma_1.default.project.create({
             data: {
@@ -70,21 +70,7 @@ router.post('/', (0, authMiddleware_1.authorizeRoles)('SUPER_ADMIN', 'ADMIN', 'S
                 phases: {
                     create: [
                         { name: 'Machine', order: 1, status: 'PENDING' },
-                        {
-                            name: 'Processes',
-                            order: 2,
-                            status: 'PENDING',
-                            resources: (processId || materialId) ? {
-                                create: [
-                                    {
-                                        processId: processId || null,
-                                        materialId: materialId || null,
-                                        materialsList: materialId ? JSON.stringify([materialId]) : null,
-                                        order: 1
-                                    }
-                                ]
-                            } : undefined
-                        }
+                        { name: 'Processes', order: 2, status: 'PENDING' }
                     ]
                 }
             },
