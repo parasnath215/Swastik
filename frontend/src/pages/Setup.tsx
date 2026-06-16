@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { Settings, Plus, Trash2, Play, Box } from 'lucide-react';
+import { Settings, Plus, Trash2, Play, Box, Edit2, X } from 'lucide-react';
 
 type TabType = 'machines' | 'processes' | 'materials';
 
@@ -9,6 +9,8 @@ export default function Setup() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('machines');
   const [formData, setFormData] = useState({ name: '', description: '', hourlyRate: 0, unitCost: 0 });
+  const [editingResource, setEditingResource] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', description: '', hourlyRate: 0, unitCost: 0 });
 
   // Fetching
   const { data: machines, isLoading: mLoading } = useQuery({ queryKey: ['machines'], queryFn: async () => (await api.get('/resources/machines')).data });
@@ -32,6 +34,23 @@ export default function Setup() {
     },
     onError: (err: any) => alert(err.response?.data?.error || 'Failed to create resource')
   });
+
+  const updateResource = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      await api.patch(`/resources/${activeTab}/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [activeTab] });
+      setEditingResource(null);
+    },
+    onError: (err: any) => alert(err.response?.data?.error || 'Failed to update resource')
+  });
+
+  const handleEditSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!editingResource || !editForm.name) return;
+    updateResource.mutate({ id: editingResource.id, data: editForm });
+  };
 
   const deleteResource = useMutation({
     mutationFn: async (id: string) => {
@@ -165,20 +184,34 @@ export default function Setup() {
                        {activeTab === 'machines' && <p className="text-xs font-bold text-slate-400 mt-2 uppercase tracking-wide">Rate: ₹{item.hourlyRate}/Hr</p>}
                        {activeTab === 'materials' && <p className="text-xs font-bold text-slate-400 mt-2 uppercase tracking-wide">Unit Cost: ₹{item.unitCost}</p>}
                      </div>
-                     <div className="flex space-x-2">
-                       {/* Edit functionality left out for brevity, but easy to add if needed */}
-                       <button 
-                         onClick={() => {
-                           if (confirm('Are you sure you want to delete this item?')) {
-                             deleteResource.mutate(item.id);
-                           }
-                         }}
-                         className="p-2 bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-700 hover:border-red-500/30 rounded-lg transition-all"
-                         title="Delete"
-                       >
-                         <Trash2 className="w-4 h-4" />
-                       </button>
-                     </div>
+                      <div className="flex space-x-2">
+                        <button 
+                          onClick={() => {
+                            setEditingResource(item);
+                            setEditForm({
+                              name: item.name,
+                              description: item.description || '',
+                              hourlyRate: item.hourlyRate || 0,
+                              unitCost: item.unitCost || 0
+                            });
+                          }}
+                          className="p-2 bg-slate-800 hover:bg-blue-500/20 text-slate-400 hover:text-blue-400 border border-slate-700 hover:border-blue-500/30 rounded-lg transition-all"
+                          title="Edit"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            if (confirm('Are you sure you want to delete this item?')) {
+                              deleteResource.mutate(item.id);
+                            }
+                          }}
+                          className="p-2 bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-700 hover:border-red-500/30 rounded-lg transition-all"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                    </div>
                  ))}
                </div>
@@ -186,6 +219,90 @@ export default function Setup() {
           </div>
         </div>
       </div>
+
+      {/* EDIT MODAL OVERLAY */}
+      {editingResource && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 backdrop-blur-sm bg-slate-950/80">
+          <div className="bg-[#0f172a] border border-slate-700 rounded-3xl w-full max-w-lg shadow-2xl relative animate-in zoom-in-95 duration-200">
+            <button 
+              onClick={() => setEditingResource(null)}
+              className="absolute top-6 right-6 p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="bg-gradient-to-r from-blue-900/40 to-[#0f172a] p-6 border-b border-slate-800 rounded-t-3xl">
+              <h3 className="text-xl font-bold text-white">Edit {activeTab.slice(0, -1)}</h3>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-1">Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full bg-slate-950/80 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-600"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-1">Description (Optional)</label>
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  className="w-full bg-slate-950/80 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-600 resize-none h-24"
+                />
+              </div>
+              
+              {activeTab === 'machines' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-1">Hourly Rate (₹) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={editForm.hourlyRate}
+                    onChange={(e) => setEditForm({ ...editForm, hourlyRate: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-slate-950/80 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-600"
+                  />
+                </div>
+              )}
+
+              {activeTab === 'materials' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-1">Unit Cost (₹) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={editForm.unitCost}
+                    onChange={(e) => setEditForm({ ...editForm, unitCost: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-slate-950/80 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-600"
+                  />
+                </div>
+              )}
+
+              <div className="pt-4 border-t border-slate-800 flex justify-end space-x-2">
+                <button 
+                  type="button" 
+                  onClick={() => setEditingResource(null)}
+                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={updateResource.isPending || !editForm.name}
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-colors shadow-md"
+                >
+                  {updateResource.isPending ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
