@@ -185,6 +185,24 @@ router.delete('/:id', authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res) =
   }
 });
 
+// Update phase name
+router.patch('/:id/name', authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      res.status(400).json({ error: 'Phase name is required' });
+      return;
+    }
+    const phase = await prisma.phase.update({
+      where: { id: req.params.id as string },
+      data: { name: name.trim() }
+    });
+    res.json(phase);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update phase name' });
+  }
+});
+
 // Reorder resource rows in a phase
 router.patch('/:id/resources/reorder', authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {

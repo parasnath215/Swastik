@@ -16,6 +16,8 @@ export default function PhaseManager() {
   const [insertingAfterPhaseId, setInsertingAfterPhaseId] = useState<string | null>(null);
   const [insertPhaseName, setInsertPhaseName] = useState<string>('');
   const [localDurations, setLocalDurations] = useState<Record<string, string>>({});
+  const [editingPhaseId, setEditingPhaseId] = useState<string | null>(null);
+  const [editPhaseName, setEditPhaseName] = useState<string>('');
 
   const movePhase = (phaseId: string, direction: 'up' | 'down', phaseList: any[]) => {
     const sortedPhases = [...phaseList].sort((a, b) => a.order - b.order);
@@ -153,6 +155,17 @@ export default function PhaseManager() {
       setSelectedPhaseId(null);
     },
     onError: (err: any) => alert(err.response?.data?.error || 'Failed to delete phase')
+  });
+
+  const updatePhaseName = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      await api.patch(`/phases/${id}/name`, { name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      setEditingPhaseId(null);
+    },
+    onError: (err: any) => alert(err.response?.data?.error || 'Failed to update phase name')
   });
 
   const reorderResources = useMutation({
@@ -359,14 +372,43 @@ export default function PhaseManager() {
                                   </div>
                                   
                                   <div className="flex-1 pt-1 flex justify-between items-center min-w-0">
-                                    <div className="min-w-0">
-                                      <h4 className={`text-sm font-bold transition-colors mb-0.5 ${isSelected ? 'text-white' : 'text-slate-300 group-hover:text-white'} truncate`}>
-                                         Phase {phase.order}: {phase.name}
-                                      </h4>
-                                      <p className={`text-[10px] font-black uppercase tracking-widest ${
-                                         isAccepted ? 'text-teal-500' :
-                                         isActive ? 'text-blue-400' : 'text-slate-500'
-                                      }`}>{phase.status.replace('_', ' ')}</p>
+                                    <div className="min-w-0 flex-1">
+                                      {editingPhaseId === phase.id ? (
+                                        <div className="flex items-center gap-1 z-30" onClick={e => e.stopPropagation()}>
+                                          <input
+                                            autoFocus
+                                            value={editPhaseName}
+                                            onChange={e => setEditPhaseName(e.target.value)}
+                                            className="bg-slate-950 border border-slate-700 rounded px-2 py-0.5 text-xs text-white outline-none focus:border-teal-500 w-full max-w-[150px]"
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') updatePhaseName.mutate({ id: phase.id, name: editPhaseName });
+                                              if (e.key === 'Escape') setEditingPhaseId(null);
+                                            }}
+                                          />
+                                          <button 
+                                            onClick={() => updatePhaseName.mutate({ id: phase.id, name: editPhaseName })} 
+                                            className="p-1 text-emerald-400 hover:bg-emerald-500/20 rounded shrink-0"
+                                          >
+                                            <Check className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button 
+                                            onClick={() => setEditingPhaseId(null)} 
+                                            className="p-1 text-slate-400 hover:bg-slate-700 rounded shrink-0"
+                                          >
+                                            <X className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <h4 className={`text-sm font-bold transition-colors mb-0.5 ${isSelected ? 'text-white' : 'text-slate-300 group-hover:text-white'} truncate`}>
+                                             Phase {phase.order}: {phase.name}
+                                          </h4>
+                                          <p className={`text-[10px] font-black uppercase tracking-widest ${
+                                             isAccepted ? 'text-teal-500' :
+                                             isActive ? 'text-blue-400' : 'text-slate-500'
+                                          }`}>{phase.status.replace('_', ' ')}</p>
+                                        </>
+                                      )}
                                     </div>
 
                                     {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
@@ -386,6 +428,16 @@ export default function PhaseManager() {
                                           title="Move Down"
                                         >
                                           <ChevronDown className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setEditingPhaseId(phase.id);
+                                            setEditPhaseName(phase.name);
+                                          }}
+                                          className="p-1 text-slate-500 hover:text-teal-400 rounded"
+                                          title="Rename Phase"
+                                        >
+                                          <Edit2 className="w-3.5 h-3.5" />
                                         </button>
                                         <button
                                           onClick={() => {
@@ -518,8 +570,43 @@ export default function PhaseManager() {
                           {/* PHASE HEADER */}
                           <div className="p-8 border-b border-slate-800/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#1e293b]/10">
                              <div>
-                               <h2 className="text-3xl font-extrabold text-white tracking-tight flex items-center">
-                                 Phase {activePhase.order}: {activePhase.name}
+                               <h2 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+                                 {editingPhaseId === activePhase.id ? (
+                                   <div className="flex items-center gap-2 z-20">
+                                     <input 
+                                       autoFocus
+                                       value={editPhaseName}
+                                       onChange={e => setEditPhaseName(e.target.value)}
+                                       className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-2xl text-white outline-none focus:border-teal-500"
+                                       onKeyDown={(e) => {
+                                         if (e.key === 'Enter') updatePhaseName.mutate({ id: activePhase.id, name: editPhaseName });
+                                         if (e.key === 'Escape') setEditingPhaseId(null);
+                                       }}
+                                     />
+                                     <button onClick={() => updatePhaseName.mutate({ id: activePhase.id, name: editPhaseName })} className="p-1.5 text-emerald-400 hover:bg-emerald-500/20 rounded-md">
+                                       <Check className="w-6 h-6" />
+                                     </button>
+                                     <button onClick={() => setEditingPhaseId(null)} className="p-1.5 text-slate-400 hover:bg-slate-700 rounded-md">
+                                       <X className="w-6 h-6" />
+                                     </button>
+                                   </div>
+                                 ) : (
+                                   <>
+                                     <span>Phase {activePhase.order}: {activePhase.name}</span>
+                                     {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
+                                       <button 
+                                         onClick={() => {
+                                           setEditingPhaseId(activePhase.id);
+                                           setEditPhaseName(activePhase.name);
+                                         }} 
+                                         className="p-1.5 text-slate-500 hover:text-teal-400 transition-colors rounded-md hover:bg-teal-500/10"
+                                         title="Rename Phase"
+                                       >
+                                         <Edit2 className="w-5 h-5" />
+                                       </button>
+                                     )}
+                                   </>
+                                 )}
                                </h2>
                                {activeProject.updates && activeProject.updates.length > 0 && (
                                  <div className="mt-4 p-4 bg-slate-900 border border-slate-700 rounded-xl max-h-32 overflow-y-auto custom-scrollbar">

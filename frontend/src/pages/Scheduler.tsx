@@ -40,8 +40,16 @@ export default function Scheduler() {
   const [operatorNotes, setOperatorNotes] = useState<Record<string, string>>({});
 
   // Queries
-  const { data: tasks } = useQuery({ queryKey: ['tasks'], queryFn: async () => (await api.get('/scheduler/tasks')).data });
-  const { data: projects } = useQuery({ queryKey: ['projects'], queryFn: async () => (await api.get('/projects')).data });
+  const { data: tasks } = useQuery({ 
+    queryKey: ['tasks'], 
+    queryFn: async () => (await api.get('/scheduler/tasks')).data,
+    refetchInterval: 5000
+  });
+  const { data: projects } = useQuery({ 
+    queryKey: ['projects'], 
+    queryFn: async () => (await api.get('/projects')).data,
+    refetchInterval: 5000
+  });
   const { data: machines } = useQuery({ queryKey: ['machines'], queryFn: async () => (await api.get('/resources/machines')).data });
   const { data: processes } = useQuery({ queryKey: ['processes'], queryFn: async () => (await api.get('/resources/processes')).data });
   const { data: materials } = useQuery({ queryKey: ['materials'], queryFn: async () => (await api.get('/resources/materials')).data });
@@ -72,6 +80,82 @@ export default function Scheduler() {
     },
     onError: (err: any) => alert(err.response?.data?.error || 'Failed to submit update')
   });
+
+  // Available resources based on selected phase and configuration
+  const availableMachines = useMemo(() => {
+    if (!scheduleModalPhase || !scheduleModalPhase.resources || scheduleModalPhase.resources.length === 0) {
+      return machines || [];
+    }
+    const configuredIds = scheduleModalPhase.resources
+      .map((r: any) => r.machineId)
+      .filter(Boolean);
+    if (configuredIds.length === 0) {
+      return machines || [];
+    }
+    return machines?.filter((m: any) => configuredIds.includes(m.id)) || [];
+  }, [scheduleModalPhase, machines]);
+
+  const availableProcesses = useMemo(() => {
+    if (!scheduleModalPhase || !scheduleModalPhase.resources || scheduleModalPhase.resources.length === 0) {
+      return processes || [];
+    }
+    const configuredIds = scheduleModalPhase.resources
+      .map((r: any) => r.processId)
+      .filter(Boolean);
+    if (configuredIds.length === 0) {
+      return processes || [];
+    }
+    return processes?.filter((p: any) => configuredIds.includes(p.id)) || [];
+  }, [scheduleModalPhase, processes]);
+
+  const availableMaterials = useMemo(() => {
+    if (!scheduleModalPhase || !scheduleModalPhase.resources || scheduleModalPhase.resources.length === 0) {
+      return materials || [];
+    }
+    
+    // Find the active resource row matching selected machine or process
+    const activeRes = scheduleModalPhase.resources.find((r: any) => {
+      if (viewMode === 'MACHINES') {
+        return r.machineId === selectedMachineId;
+      } else {
+        return r.processId === selectedProcessId;
+      }
+    });
+
+    if (activeRes) {
+      let materialIds: string[] = [];
+      if (activeRes.materialsList) {
+        try {
+          materialIds = JSON.parse(activeRes.materialsList);
+        } catch (e) {}
+      } else if (activeRes.materialId) {
+        materialIds = [activeRes.materialId];
+      }
+      
+      if (materialIds.length > 0) {
+        return materials?.filter((m: any) => materialIds.includes(m.id)) || [];
+      }
+    }
+
+    // Fallback: if no active resource match or no materials specified, show all materials assigned to any resource in the phase
+    const allPhaseMatIds = scheduleModalPhase.resources.flatMap((r: any) => {
+      let ids: string[] = [];
+      if (r.materialsList) {
+        try {
+          ids = JSON.parse(r.materialsList);
+        } catch (e) {}
+      } else if (r.materialId) {
+        ids = [r.materialId];
+      }
+      return ids;
+    }).filter(Boolean);
+
+    if (allPhaseMatIds.length > 0) {
+      return materials?.filter((m: any) => allPhaseMatIds.includes(m.id)) || [];
+    }
+
+    return materials || [];
+  }, [scheduleModalPhase, selectedMachineId, selectedProcessId, viewMode, materials]);
 
   // Calculate The Running Tasks
   const activeBookings = useMemo(() => {
@@ -259,11 +343,32 @@ export default function Scheduler() {
                     <label className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Target Machine</label>
                     <select 
                       value={selectedMachineId} 
-                      onChange={e => setSelectedMachineId(e.target.value)} 
+                      onChange={e => {
+                        const mId = e.target.value;
+                        setSelectedMachineId(mId);
+                        
+                        // Sync process, material and duration from matching resource row
+                        const matchingRes = scheduleModalPhase?.resources?.find((r: any) => r.machineId === mId);
+                        if (matchingRes) {
+                          if (matchingRes.processId) setSelectedProcessId(matchingRes.processId);
+                          
+                          let matId = '';
+                          if (matchingRes.materialsList) {
+                            try {
+                              const list = JSON.parse(matchingRes.materialsList);
+                              if (list && list.length > 0) matId = list[0];
+                            } catch (e) {}
+                          } else if (matchingRes.materialId) {
+                            matId = matchingRes.materialId;
+                          }
+                          setSelectedMaterialId(matId);
+                          if (matchingRes.expectedDuration) setRuntimeHours(matchingRes.expectedDuration);
+                        }
+                      }} 
                       className="w-full h-14 px-4 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all font-semibold appearance-none"
                     >
                       <option value="">-- Select Target Machine --</option>
-                      {machines?.map((m: any) => (
+                      {availableMachines?.map((m: any) => (
                         <option key={m.id} value={m.id}>{m.name}</option>
                       ))}
                     </select>
@@ -275,11 +380,32 @@ export default function Scheduler() {
                     <label className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Target Process</label>
                     <select 
                       value={selectedProcessId} 
-                      onChange={e => setSelectedProcessId(e.target.value)} 
+                      onChange={e => {
+                        const pId = e.target.value;
+                        setSelectedProcessId(pId);
+                        
+                        // Sync machine, material and duration from matching resource row
+                        const matchingRes = scheduleModalPhase?.resources?.find((r: any) => r.processId === pId);
+                        if (matchingRes) {
+                          if (matchingRes.machineId) setSelectedMachineId(matchingRes.machineId);
+                          
+                          let matId = '';
+                          if (matchingRes.materialsList) {
+                            try {
+                              const list = JSON.parse(matchingRes.materialsList);
+                              if (list && list.length > 0) matId = list[0];
+                            } catch (e) {}
+                          } else if (matchingRes.materialId) {
+                            matId = matchingRes.materialId;
+                          }
+                          setSelectedMaterialId(matId);
+                          if (matchingRes.expectedDuration) setRuntimeHours(matchingRes.expectedDuration);
+                        }
+                      }} 
                       className="w-full h-14 px-4 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all font-semibold appearance-none"
                     >
                       <option value="">-- Select Target Process --</option>
-                      {processes?.map((p: any) => (
+                      {availableProcesses?.map((p: any) => (
                         <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
                     </select>
@@ -294,7 +420,7 @@ export default function Scheduler() {
                     className="w-full h-14 px-4 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all font-semibold appearance-none"
                   >
                     <option value="">-- Select Active Material --</option>
-                    {materials?.map((m: any) => (
+                    {availableMaterials?.map((m: any) => (
                       <option key={m.id} value={m.id}>{m.name}</option>
                     ))}
                   </select>
@@ -449,41 +575,21 @@ export default function Scheduler() {
                       onClick={() => {
                         setScheduleModalPhase(task);
                         if (task.resources && task.resources.length > 0) {
-                          // Find first resource row with a machineId
-                          const resWithMachine = task.resources.find((r: any) => r.machineId);
-                          if (resWithMachine) setSelectedMachineId(resWithMachine.machineId);
-                          else setSelectedMachineId('');
+                          const firstRes = task.resources[0];
+                          setSelectedMachineId(firstRes.machineId || '');
+                          setSelectedProcessId(firstRes.processId || '');
                           
-                          // Find first resource row with a processId
-                          const resWithProcess = task.resources.find((r: any) => r.processId);
-                          if (resWithProcess) setSelectedProcessId(resWithProcess.processId);
-                          else setSelectedProcessId('');
-                          
-                          // Find first resource row with a materialId or materialsList
-                          const resWithMaterial = task.resources.find((r: any) => r.materialId || r.materialsList);
-                          if (resWithMaterial) {
-                            if (resWithMaterial.materialId) {
-                              setSelectedMaterialId(resWithMaterial.materialId);
-                            } else if (resWithMaterial.materialsList) {
-                              try {
-                                const list = JSON.parse(resWithMaterial.materialsList);
-                                if (list && list.length > 0) setSelectedMaterialId(list[0]);
-                                else setSelectedMaterialId('');
-                              } catch (e) { setSelectedMaterialId(''); }
-                            } else {
-                              setSelectedMaterialId('');
-                            }
-                          } else {
-                            setSelectedMaterialId('');
+                          let matId = '';
+                          if (firstRes.materialsList) {
+                            try {
+                              const list = JSON.parse(firstRes.materialsList);
+                              if (list && list.length > 0) matId = list[0];
+                            } catch (e) {}
+                          } else if (firstRes.materialId) {
+                            matId = firstRes.materialId;
                           }
-
-                          // Find first resource row with an expectedDuration
-                          const resWithDuration = task.resources.find((r: any) => r.expectedDuration);
-                          if (resWithDuration) {
-                            setRuntimeHours(resWithDuration.expectedDuration);
-                          } else {
-                            setRuntimeHours(24);
-                          }
+                          setSelectedMaterialId(matId);
+                          setRuntimeHours(firstRes.expectedDuration || 24);
                         } else {
                           setSelectedMachineId('');
                           setSelectedProcessId('');
