@@ -219,50 +219,95 @@ export default function Scheduler() {
     });
   }, [tasks, viewMode]);
 
-  // Flatten phases for left navigation
+  // Flatten phase resources for left navigation
   const phaseList = useMemo(() => {
     if (!projects) return [];
-    let allPhases: any[] = [];
+    let list: any[] = [];
+    
     projects.forEach((p: any) => {
       // Gatekeeping: Operator ONLY sees projects that have been formally 'Started' by Admin
       if (p.status === 'LEAD') return;
       
       if (p.phases) {
         p.phases.forEach((phase: any) => {
-          allPhases.push({
-            ...phase,
-            projectName: p.name,
-            projectStatus: p.status,
-            priority: (phase.order % 3 === 1) ? 'High' : (phase.order % 2 === 0) ? 'Medium' : 'Low'
-          });
+          const resources = phase.resources || [];
+          
+          if (resources.length === 0) {
+            const isProcessPhase = phase.name?.toLowerCase().includes('process');
+            const matchView = viewMode === 'MACHINES' ? !isProcessPhase : isProcessPhase;
+            if (matchView) {
+              list.push({
+                ...phase,
+                projectName: p.name,
+                projectStatus: p.status,
+                priority: (phase.order % 3 === 1) ? 'High' : (phase.order % 2 === 0) ? 'Medium' : 'Low',
+                resourceRow: null,
+                displayName: `Phase ${phase.order}: ${phase.name}`
+              });
+            }
+          } else {
+            resources.forEach((res: any) => {
+              if (viewMode === 'MACHINES') {
+                if (res.machineId) {
+                  const machineName = machines?.find((m: any) => m.id === res.machineId)?.name || 'Machine';
+                  list.push({
+                    ...phase,
+                    projectName: p.name,
+                    projectStatus: p.status,
+                    priority: (phase.order % 3 === 1) ? 'High' : (phase.order % 2 === 0) ? 'Medium' : 'Low',
+                    resourceRow: res,
+                    displayName: `Phase ${phase.order}: ${phase.name} (${machineName})`
+                  });
+                }
+              } else {
+                if (res.processId) {
+                  const processName = processes?.find((pr: any) => pr.id === res.processId)?.name || 'Process';
+                  list.push({
+                    ...phase,
+                    projectName: p.name,
+                    projectStatus: p.status,
+                    priority: (phase.order % 3 === 1) ? 'High' : (phase.order % 2 === 0) ? 'Medium' : 'Low',
+                    resourceRow: res,
+                    displayName: `Phase ${phase.order}: ${phase.name} (${processName})`
+                  });
+                }
+              }
+            });
+          }
         });
       }
     });
 
     const now = new Date();
 
-    return allPhases.filter(p => {
-      const isProcessPhase = p.name?.toLowerCase().includes('process');
-      if (viewMode === 'MACHINES') {
-        return !isProcessPhase;
+    return list.map(item => {
+      const phaseTasks = tasks?.filter((t: any) => t.phaseId === item.id) || [];
+      
+      let isMatchActive = false;
+      let hasBeenBooked = false;
+      
+      if (item.resourceRow) {
+        if (viewMode === 'MACHINES' && item.resourceRow.machineId) {
+          isMatchActive = phaseTasks.some((t: any) => t.machineId === item.resourceRow.machineId && new Date(t.endTime) > now);
+          hasBeenBooked = phaseTasks.some((t: any) => t.machineId === item.resourceRow.machineId);
+        } else if (viewMode === 'PROCESSES' && item.resourceRow.processId) {
+          isMatchActive = phaseTasks.some((t: any) => t.processId === item.resourceRow.processId && new Date(t.endTime) > now);
+          hasBeenBooked = phaseTasks.some((t: any) => t.processId === item.resourceRow.processId);
+        }
       } else {
-        return isProcessPhase;
+        isMatchActive = phaseTasks.some((t: any) => new Date(t.endTime) > now);
+        hasBeenBooked = phaseTasks.length > 0;
       }
-    }).map(p => {
-      // Is there an active task booking for this specific phase?
-      const phaseTasks = tasks?.filter((t: any) => t.phaseId === p.id) || [];
-      const hasUpcomingBooking = phaseTasks.some((t: any) => new Date(t.endTime) > now);
       
       let calculatedState = 'PENDING';
-      if (hasUpcomingBooking) calculatedState = 'ACTIVE';
-      else if (p.status === 'ACCEPTED' || (phaseTasks.length > 0 && !hasUpcomingBooking)) {
-        // If entirely in the past or physically accepted
+      if (isMatchActive) calculatedState = 'ACTIVE';
+      else if (item.status === 'ACCEPTED' || hasBeenBooked) {
         calculatedState = 'ACCEPTED';
       }
 
-      return { ...p, calculatedState };
+      return { ...item, calculatedState };
     });
-  }, [projects, tasks, viewMode]);
+  }, [projects, tasks, viewMode, machines, processes]);
 
   const displayedTasks = phaseList.filter(p => p.calculatedState === activeTab);
 
@@ -601,7 +646,7 @@ export default function Scheduler() {
             )}
             
             {displayedTasks.map(task => (
-                <div key={task.id} className="p-5 rounded-2xl border border-slate-800 bg-slate-900/80 hover:border-slate-600 transition-all group relative">
+                <div key={task.resourceRow ? `${task.id}-${task.resourceRow.id}` : task.id} className="p-5 rounded-2xl border border-slate-800 bg-slate-900/80 hover:border-slate-600 transition-all group relative">
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded border ${
@@ -612,7 +657,7 @@ export default function Scheduler() {
                         Priority: {task.priority}
                       </span>
                       <h3 className="text-lg font-bold text-white mt-3 leading-tight">{task.projectName}</h3>
-                      <p className="text-sm font-medium text-slate-400 mt-0.5">Phase {task.order}: {task.name}</p>
+                      <p className="text-sm font-medium text-slate-400 mt-0.5">{task.displayName || `Phase ${task.order}: ${task.name}`}</p>
                     </div>
                   </div>
                   
@@ -620,7 +665,23 @@ export default function Scheduler() {
                     <button 
                       onClick={() => {
                         setScheduleModalPhase(task);
-                        if (task.resources && task.resources.length > 0) {
+                        if (task.resourceRow) {
+                          const r = task.resourceRow;
+                          setSelectedMachineId(r.machineId || '');
+                          setSelectedProcessId(r.processId || '');
+                          
+                          let matId = '';
+                          if (r.materialId) {
+                            matId = r.materialId;
+                          } else if (r.materialsList) {
+                            try {
+                              const list = JSON.parse(r.materialsList);
+                              if (list && list.length > 0) matId = list[0];
+                            } catch (e) {}
+                          }
+                          setSelectedMaterialId(matId);
+                          setRuntimeHours(r.expectedDuration || 24);
+                        } else if (task.resources && task.resources.length > 0) {
                           // Find first resource row with a machineId
                           const resWithMachine = task.resources.find((r: any) => r.machineId);
                           setSelectedMachineId(resWithMachine ? resWithMachine.machineId : '');
