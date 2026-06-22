@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -156,6 +156,33 @@ export default function Scheduler() {
 
     return materials || [];
   }, [scheduleModalPhase, selectedMachineId, selectedProcessId, viewMode, materials]);
+
+  const phaseConfiguredMaterials = useMemo(() => {
+    if (!scheduleModalPhase || !scheduleModalPhase.resources) return [];
+    return scheduleModalPhase.resources.flatMap((r: any) => {
+      let ids: string[] = [];
+      if (r.materialsList) {
+        try {
+          ids = JSON.parse(r.materialsList);
+        } catch (e) {}
+      } else if (r.materialId) {
+        ids = [r.materialId];
+      }
+      return ids;
+    }).filter(Boolean);
+  }, [scheduleModalPhase]);
+
+  // Auto-select material if there are materials configured for this phase in the Phase Manager
+  useEffect(() => {
+    if (phaseConfiguredMaterials && phaseConfiguredMaterials.length > 0) {
+      const isSelectedValid = availableMaterials.some((m: any) => m.id === selectedMaterialId);
+      if (!isSelectedValid) {
+        if (availableMaterials.length > 0) {
+          setSelectedMaterialId(availableMaterials[0].id);
+        }
+      }
+    }
+  }, [availableMaterials, selectedMaterialId, phaseConfiguredMaterials]);
 
   // Calculate The Running Tasks
   const activeBookings = useMemo(() => {
@@ -575,21 +602,43 @@ export default function Scheduler() {
                       onClick={() => {
                         setScheduleModalPhase(task);
                         if (task.resources && task.resources.length > 0) {
-                          const firstRes = task.resources[0];
-                          setSelectedMachineId(firstRes.machineId || '');
-                          setSelectedProcessId(firstRes.processId || '');
+                          // Find first resource row with a machineId
+                          const resWithMachine = task.resources.find((r: any) => r.machineId);
+                          setSelectedMachineId(resWithMachine ? resWithMachine.machineId : '');
                           
+                          // Find first resource row with a processId
+                          const resWithProcess = task.resources.find((r: any) => r.processId);
+                          setSelectedProcessId(resWithProcess ? resWithProcess.processId : '');
+                          
+                          // Find first resource row with a material configuration
                           let matId = '';
-                          if (firstRes.materialsList) {
-                            try {
-                              const list = JSON.parse(firstRes.materialsList);
-                              if (list && list.length > 0) matId = list[0];
-                            } catch (e) {}
-                          } else if (firstRes.materialId) {
-                            matId = firstRes.materialId;
+                          const resWithMaterial = task.resources.find((r: any) => {
+                            if (r.materialId) return true;
+                            if (r.materialsList) {
+                              try {
+                                const list = JSON.parse(r.materialsList);
+                                return list && list.length > 0;
+                              } catch (e) {
+                                return false;
+                              }
+                            }
+                            return false;
+                          });
+                          if (resWithMaterial) {
+                            if (resWithMaterial.materialId) {
+                              matId = resWithMaterial.materialId;
+                            } else if (resWithMaterial.materialsList) {
+                              try {
+                                const list = JSON.parse(resWithMaterial.materialsList);
+                                if (list && list.length > 0) matId = list[0];
+                              } catch (e) {}
+                            }
                           }
                           setSelectedMaterialId(matId);
-                          setRuntimeHours(firstRes.expectedDuration || 24);
+                          
+                          // Find expected duration
+                          const resWithDuration = task.resources.find((r: any) => r.expectedDuration);
+                          setRuntimeHours(resWithDuration ? resWithDuration.expectedDuration : 24);
                         } else {
                           setSelectedMachineId('');
                           setSelectedProcessId('');
