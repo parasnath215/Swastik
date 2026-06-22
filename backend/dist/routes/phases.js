@@ -101,15 +101,21 @@ router.post('/:id/resources', (0, authMiddleware_1.authorizeRoles)('SUPER_ADMIN'
 router.patch('/resources/:resId', (0, authMiddleware_1.authorizeRoles)('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
     try {
         const { machineId, processId, materialId, materialsList, expectedDuration } = req.body;
+        const updateData = {};
+        if (machineId !== undefined)
+            updateData.machineId = machineId || null;
+        if (processId !== undefined)
+            updateData.processId = processId || null;
+        if (materialId !== undefined)
+            updateData.materialId = materialId || null;
+        if (materialsList !== undefined)
+            updateData.materialsList = materialsList ? JSON.stringify(materialsList) : null;
+        if (expectedDuration !== undefined) {
+            updateData.expectedDuration = (expectedDuration !== null && expectedDuration !== '') ? parseInt(expectedDuration) : null;
+        }
         const resource = await prisma_1.default.phaseResource.update({
             where: { id: req.params.resId },
-            data: {
-                machineId,
-                processId,
-                materialId,
-                materialsList: materialsList ? JSON.stringify(materialsList) : null,
-                expectedDuration: expectedDuration ? parseInt(expectedDuration) : null
-            }
+            data: updateData
         });
         res.json(resource);
     }
@@ -178,6 +184,24 @@ router.delete('/:id', (0, authMiddleware_1.authorizeRoles)('SUPER_ADMIN', 'ADMIN
     }
     catch (error) {
         res.status(500).json({ error: 'Failed to delete phase' });
+    }
+});
+// Update phase name
+router.patch('/:id/name', (0, authMiddleware_1.authorizeRoles)('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+    try {
+        const { name } = req.body;
+        if (!name || !name.trim()) {
+            res.status(400).json({ error: 'Phase name is required' });
+            return;
+        }
+        const phase = await prisma_1.default.phase.update({
+            where: { id: req.params.id },
+            data: { name: name.trim() }
+        });
+        res.json(phase);
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to update phase name' });
     }
 });
 // Reorder resource rows in a phase

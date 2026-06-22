@@ -102,15 +102,18 @@ router.post('/:id/resources', authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req
 router.patch('/resources/:resId', authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
     const { machineId, processId, materialId, materialsList, expectedDuration } = req.body;
+    const updateData: any = {};
+    if (machineId !== undefined) updateData.machineId = machineId || null;
+    if (processId !== undefined) updateData.processId = processId || null;
+    if (materialId !== undefined) updateData.materialId = materialId || null;
+    if (materialsList !== undefined) updateData.materialsList = materialsList ? JSON.stringify(materialsList) : null;
+    if (expectedDuration !== undefined) {
+      updateData.expectedDuration = (expectedDuration !== null && expectedDuration !== '') ? parseInt(expectedDuration) : null;
+    }
+
     const resource = await prisma.phaseResource.update({
       where: { id: req.params.resId as string },
-      data: { 
-        machineId, 
-        processId, 
-        materialId,
-        materialsList: materialsList ? JSON.stringify(materialsList) : null,
-        expectedDuration: expectedDuration ? parseInt(expectedDuration) : null
-      }
+      data: updateData
     });
     res.json(resource);
   } catch (err) {
