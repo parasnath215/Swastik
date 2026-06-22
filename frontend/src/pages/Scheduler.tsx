@@ -18,6 +18,21 @@ const getDefaultDate = () => {
   return d;
 };
 
+const getDatesBetween = (start: Date, end: Date): Date[] => {
+  const dates: Date[] = [];
+  const current = new Date(start);
+  current.setHours(0, 0, 0, 0);
+  
+  const last = new Date(end);
+  last.setHours(0, 0, 0, 0);
+
+  while (current <= last) {
+    dates.push(new Date(current));
+    current.setDate(current.getDate() + 1);
+  }
+  return dates;
+};
+
 export default function Scheduler() {
   const queryClient = useQueryClient();
   const user = useAuthStore(state => state.user);
@@ -294,13 +309,17 @@ export default function Scheduler() {
 
   const getOccupiedDates = () => {
     if (!tasks) return [];
-    if (!selectedMachineId && !selectedProcessId) return [];
-    return tasks.filter((t: any) => {
-      let isMatch = false;
-      if (selectedMachineId && t.machineId === selectedMachineId) isMatch = true;
-      if (selectedProcessId && t.processId === selectedProcessId) isMatch = true;
-      return isMatch;
-    }).map((t: any) => new Date(t.startTime));
+    if (viewMode === 'MACHINES') {
+      if (!selectedMachineId) return [];
+      return tasks
+        .filter((t: any) => t.machineId === selectedMachineId)
+        .flatMap((t: any) => getDatesBetween(new Date(t.startTime), new Date(t.endTime)));
+    } else {
+      if (!selectedProcessId) return [];
+      return tasks
+        .filter((t: any) => t.processId === selectedProcessId)
+        .flatMap((t: any) => getDatesBetween(new Date(t.startTime), new Date(t.endTime)));
+    }
   };
 
   // Timeline Prep
