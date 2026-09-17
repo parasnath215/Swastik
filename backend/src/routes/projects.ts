@@ -60,6 +60,17 @@ router.post('/', authorizeRoles('SUPER_ADMIN', 'ADMIN', 'SALES'), upload.array('
   try {
     const { name, phone, address, dimensions, budget } = req.body;
     
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      res.status(400).json({ error: 'Project name is required' });
+      return;
+    }
+
+    const parsedBudget = parseFloat(budget || '0');
+    if (isNaN(parsedBudget) || parsedBudget < 0) {
+      res.status(400).json({ error: 'Budget must be a valid non-negative number' });
+      return;
+    }
+    
     // Create the project first
     const project = await prisma.project.create({
       data: { 
@@ -67,7 +78,7 @@ router.post('/', authorizeRoles('SUPER_ADMIN', 'ADMIN', 'SALES'), upload.array('
         phone, 
         address, 
         dimensions, 
-        budget: parseFloat(budget || '0'), 
+        budget: parsedBudget, 
         status: 'LEAD',
         phases: {
           create: [

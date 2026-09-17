@@ -8,6 +8,7 @@ import { Clock, AlertTriangle, Calendar, Briefcase, Zap, CheckCircle2, X, Send, 
 import { useAuthStore } from '../store/useAuthStore';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import toast from 'react-hot-toast';
 
 const getDefaultDate = () => {
   const d = new Date();
@@ -91,9 +92,9 @@ export default function Scheduler() {
     },
     onSuccess: (_, variables) => {
       setOperatorNotes(prev => ({ ...prev, [variables.projectId]: '' }));
-      alert('Update submitted to Admin!');
+      toast.success('Update submitted to Admin!');
     },
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to submit update')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to submit update')
   });
 
   // Available resources based on selected phase and configuration
@@ -791,7 +792,7 @@ export default function Scheduler() {
                                  if (confirm('Are you sure you want to finish this task early? The resource will be freed up immediately.')) {
                                    api.patch(`/scheduler/tasks/${booking.id}`, { action: 'finish_early' })
                                      .then(() => queryClient.invalidateQueries({ queryKey: ['tasks'] }))
-                                     .catch(err => alert(err.response?.data?.error || 'Failed to update'));
+                                     .catch(err => toast.error(err.response?.data?.error || 'Failed to update'));
                                  }
                                }}
                                className="px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-lg font-bold text-xs tracking-wider uppercase transition-colors"
@@ -822,7 +823,7 @@ export default function Scheduler() {
                                   if (hrs > 0) {
                                     api.patch(`/scheduler/tasks/${booking.id}`, { action: 'add_hours', hours: hrs })
                                        .then(() => queryClient.invalidateQueries({ queryKey: ['tasks'] }))
-                                       .catch(err => alert(err.response?.data?.error || 'Failed to update'));
+                                       .catch(err => toast.error(err.response?.data?.error || 'Failed to update'));
                                   }
                                 }}
                                 className="h-10 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg font-bold uppercase tracking-wider text-[10px] transition-colors shrink-0"

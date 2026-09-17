@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import { Users, Plus, Edit2, Trash2, Key } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
+import toast from 'react-hot-toast';
 
 export default function UsersManagement() {
   const queryClient = useQueryClient();
@@ -26,8 +27,9 @@ export default function UsersManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setFormData({ name: '', email: '', password: '', role: 'OPERATOR' });
+      toast.success('User created successfully');
     },
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to create user')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to create user')
   });
 
   const updateUser = useMutation({
@@ -36,14 +38,18 @@ export default function UsersManagement() {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setIsEditing(null);
       setFormData({ name: '', email: '', password: '', role: 'OPERATOR' });
+      toast.success('User updated successfully');
     },
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to update user')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to update user')
   });
 
   const deleteUser = useMutation({
     mutationFn: async (id: string) => await api.delete(`/users/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to delete user')
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('User deleted successfully');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to delete user')
   });
 
   const handleSubmit = (e: React.FormEvent) => {

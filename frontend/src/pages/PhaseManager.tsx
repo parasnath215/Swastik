@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { CheckCircle, AlertCircle, Trash2, Settings, Wrench, Box, Plus, ChevronDown, ChevronRight, Play, Edit2, Check, X, Clock, MessageSquare, ChevronUp } from 'lucide-react';
+import {  CheckCircle, AlertCircle, Trash2, Settings, Wrench, Box, Plus, ChevronDown, ChevronRight, Play, Edit2, Check, X, Clock, MessageSquare, ChevronUp  } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useAuthStore } from '../store/useAuthStore';
 import CreatableSelect from 'react-select/creatable';
 
@@ -70,7 +71,7 @@ export default function PhaseManager() {
       await api.patch(`/projects/${id}/status`, { status });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to update project')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to update project')
   });
 
   const updatePhase = useMutation({
@@ -78,7 +79,7 @@ export default function PhaseManager() {
       await api.patch(`/phases/${id}/status`, data);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to update phase')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to update phase')
   });
 
   const updateProjectName = useMutation({
@@ -89,7 +90,7 @@ export default function PhaseManager() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       setEditingProjectId(null);
     },
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to update project name')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to update project name')
   });
 
   const createMaterial = useMutation({
@@ -98,7 +99,7 @@ export default function PhaseManager() {
       return res.data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['materials'] }),
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to create material')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to create material')
   });
 
   const addResource = useMutation({
@@ -106,7 +107,7 @@ export default function PhaseManager() {
       await api.post(`/phases/${phaseId}/resources`, { order });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to add row')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to add row')
   });
 
   const updateResource = useMutation({
@@ -114,7 +115,7 @@ export default function PhaseManager() {
       await api.patch(`/phases/resources/${resId}`, data);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to update row')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to update row')
   });
 
   const deleteResource = useMutation({
@@ -122,7 +123,7 @@ export default function PhaseManager() {
       await api.delete(`/phases/resources/${resId}`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to delete row')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to delete row')
   });
 
   const createPhase = useMutation({
@@ -134,7 +135,7 @@ export default function PhaseManager() {
       setNewPhaseNames({});
     },
     onError: (err: any) => {
-      alert(err.response?.data?.error || 'Failed to create phase');
+      toast.error(err.response?.data?.error || 'Failed to create phase');
     }
   });
 
@@ -143,7 +144,7 @@ export default function PhaseManager() {
       await api.patch('/phases/reorder', { phaseIds });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to reorder phases')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to reorder phases')
   });
 
   const deletePhase = useMutation({
@@ -154,7 +155,7 @@ export default function PhaseManager() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       setSelectedPhaseId(null);
     },
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to delete phase')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to delete phase')
   });
 
   const updatePhaseName = useMutation({
@@ -165,7 +166,7 @@ export default function PhaseManager() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       setEditingPhaseId(null);
     },
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to update phase name')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to update phase name')
   });
 
   const reorderResources = useMutation({
@@ -173,7 +174,7 @@ export default function PhaseManager() {
       await api.patch(`/phases/${phaseId}/resources/reorder`, { resourceIds });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to reorder resource rows')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to reorder resource rows')
   });
 
   const deleteProject = useMutation({
@@ -184,7 +185,7 @@ export default function PhaseManager() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       if (selectedProjectId === projectId) setSelectedProjectId(null);
     },
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to delete project')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to delete project')
   });
 
   // Auto-select phase logistics when accordion opens

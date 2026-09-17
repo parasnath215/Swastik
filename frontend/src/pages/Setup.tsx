@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import { Settings, Plus, Trash2, Play, Box, Edit2, X } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 type TabType = 'machines' | 'processes' | 'materials';
 
@@ -31,8 +32,9 @@ export default function Setup() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [activeTab] });
       setFormData({ name: '', description: '', hourlyRate: 0, unitCost: 0 });
+      toast.success(`${activeTab.slice(0, -1)} created successfully`);
     },
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to create resource')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to create resource')
   });
 
   const updateResource = useMutation({
@@ -42,8 +44,9 @@ export default function Setup() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [activeTab] });
       setEditingResource(null);
+      toast.success(`${activeTab.slice(0, -1)} updated successfully`);
     },
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to update resource')
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to update resource')
   });
 
   const handleEditSubmit = (e: FormEvent) => {
@@ -56,8 +59,11 @@ export default function Setup() {
     mutationFn: async (id: string) => {
       await api.delete(`/resources/${activeTab}/${id}`);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [activeTab] }),
-    onError: (err: any) => alert(err.response?.data?.error || 'Failed to delete resource')
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [activeTab] });
+      toast.success(`${activeTab.slice(0, -1)} deleted successfully`);
+    },
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to delete resource')
   });
 
   const handleSubmit = (e: FormEvent) => {

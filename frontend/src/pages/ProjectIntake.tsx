@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { Save, User, Phone, MapPin, Ruler, IndianRupee, FileUp, X } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function ProjectIntake() {
   const navigate = useNavigate();
@@ -9,9 +10,7 @@ export default function ProjectIntake() {
     name: '', phone: '', address: '', dimensions: '', budget: ''
   });
   const [files, setFiles] = useState<File[]>([]);
-  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const [fileError, setFileError] = useState('');
 
   const evaluateMath = (expr: string) => {
     try {
@@ -42,17 +41,16 @@ export default function ProjectIntake() {
       files.forEach(file => data.append('files', file));
 
       await api.post('/projects', data);
-      setSuccess('Project successfully created!');
+      toast.success('Project successfully created!');
       setFormData({ name: '', phone: '', address: '', dimensions: '', budget: '' });
       setFiles([]);
       setTimeout(() => {
-        setSuccess('');
         // Navigate to Phase Manager after successful creation
         navigate('/');
       }, 1500);
     } catch (err: any) {
       console.error(err);
-      setFileError(err.response?.data?.error || 'Failed to create project');
+      toast.error(err.response?.data?.error || 'Failed to create project');
     } finally {
       setLoading(false);
     }
@@ -67,13 +65,12 @@ export default function ProjectIntake() {
       const newFiles = Array.from(e.target.files);
       const validFiles = newFiles.filter(file => {
         if (file.size > 5 * 1024 * 1024) {
-          setFileError('One or more files exceed the 5MB limit.');
+          toast.error('One or more files exceed the 5MB limit.');
           return false;
         }
         return true;
       });
       if (validFiles.length > 0) {
-        setFileError('');
         setFiles(prev => [...prev, ...validFiles]);
       }
     }
@@ -89,18 +86,6 @@ export default function ProjectIntake() {
         <h1 className="text-3xl font-bold text-white tracking-tight">Project Intake</h1>
         <p className="text-slate-400 mt-2">Create a new lead and capture requirements.</p>
       </div>
-
-      {success && (
-        <div className="p-4 mb-6 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl font-medium animate-in fade-in slide-in-from-top-4">
-          {success}
-        </div>
-      )}
-      
-      {fileError && (
-        <div className="p-4 mb-6 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl font-medium animate-in fade-in slide-in-from-top-4">
-          {fileError}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 p-8 rounded-2xl shadow-xl space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

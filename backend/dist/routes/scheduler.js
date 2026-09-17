@@ -28,17 +28,20 @@ router.post('/schedule', (0, authMiddleware_1.authorizeRoles)('SUPER_ADMIN', 'AD
         // Find conflicting tasks for this machine
         const requestedStart = new Date(startTime);
         let calculatedStart = requestedStart;
-        // Find the latest task assigned to this machine or process
-        const resourceFilter = machineId ? { machineId } : { processId };
-        const latestTask = await prisma_1.default.task.findFirst({
-            where: resourceFilter,
-            orderBy: { endTime: 'desc' }
-        });
-        if (latestTask && latestTask.endTime > calculatedStart) {
-            // Conflict resolution: queue it right after the latest task
-            calculatedStart = new Date(latestTask.endTime);
-        }
         const calculatedEnd = new Date(calculatedStart.getTime() + duration * 60000);
+        const resourceFilter = machineId ? { machineId } : { processId };
+        // Find conflicting tasks for this machine in the exact timeframe
+        const conflictingTask = await prisma_1.default.task.findFirst({
+            where: {
+                ...resourceFilter,
+                startTime: { lt: calculatedEnd },
+                endTime: { gt: calculatedStart }
+            }
+        });
+        if (conflictingTask) {
+            res.status(409).json({ error: 'Resource unavailable during this timeframe' });
+            return;
+        }
         const task = await prisma_1.default.task.create({
             data: {
                 phaseId,
