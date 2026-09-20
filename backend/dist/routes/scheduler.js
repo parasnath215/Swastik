@@ -25,6 +25,23 @@ router.post('/schedule', (0, authMiddleware_1.authorizeRoles)('SUPER_ADMIN', 'AD
     try {
         const { phaseId, machineId, processId, materialId, duration, startTime } = req.body;
         // duration in minutes
+        // Check if phase is valid and previous phases are completed
+        const phase = await prisma_1.default.phase.findUnique({ where: { id: phaseId } });
+        if (!phase) {
+            res.status(404).json({ error: 'Phase not found' });
+            return;
+        }
+        const uncompletedPrevPhases = await prisma_1.default.phase.findFirst({
+            where: {
+                projectId: phase.projectId,
+                order: { lt: phase.order },
+                status: { not: 'ACCEPTED' }
+            }
+        });
+        if (uncompletedPrevPhases) {
+            res.status(400).json({ error: 'Cannot schedule task: previous phases must be completed first' });
+            return;
+        }
         // Find conflicting tasks for this machine
         const requestedStart = new Date(startTime);
         let calculatedStart = requestedStart;

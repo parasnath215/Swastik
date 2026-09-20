@@ -39,13 +39,17 @@ router.patch('/:id/status', (0, authMiddleware_1.authorizeRoles)('SUPER_ADMIN', 
             res.status(404).json({ error: 'Phase not found' });
             return;
         }
-        // FSM Logic: Phase N+1 cannot begin until Phase N is ACCEPTED
+        // FSM Logic: Phase N cannot begin until all phases < N are ACCEPTED
         if (status === 'IN_PROGRESS') {
-            const prevPhase = await prisma_1.default.phase.findFirst({
-                where: { projectId: phase.projectId, order: phase.order - 1 }
+            const uncompletedPrevPhases = await prisma_1.default.phase.findFirst({
+                where: {
+                    projectId: phase.projectId,
+                    order: { lt: phase.order },
+                    status: { not: 'ACCEPTED' }
+                }
             });
-            if (prevPhase && prevPhase.status !== 'ACCEPTED') {
-                res.status(400).json({ error: 'Previous phase is not accepted yet' });
+            if (uncompletedPrevPhases) {
+                res.status(400).json({ error: 'Previous phases must be completed first' });
                 return;
             }
         }
@@ -91,6 +95,31 @@ router.post('/:id/resources', (0, authMiddleware_1.authorizeRoles)('SUPER_ADMIN'
                 }
             });
         });
+        // Auto-schedule task
+        if (expectedDuration && (machineId || processId)) {
+            const durationInMinutes = parseInt(expectedDuration) * 60;
+            const durationInMs = durationInMinutes * 60000;
+            const resourceFilter = machineId ? { machineId } : { processId };
+            const lastTask = await prisma_1.default.task.findFirst({
+                where: resourceFilter,
+                orderBy: { endTime: 'desc' }
+            });
+            let calculatedStart = new Date();
+            if (lastTask && lastTask.endTime > calculatedStart) {
+                calculatedStart = lastTask.endTime;
+            }
+            await prisma_1.default.task.create({
+                data: {
+                    phaseId,
+                    machineId: machineId || null,
+                    processId: processId || null,
+                    materialId: materialId || null,
+                    duration: durationInMinutes,
+                    startTime: calculatedStart,
+                    endTime: new Date(calculatedStart.getTime() + durationInMs)
+                }
+            });
+        }
         res.json(resource);
     }
     catch (err) {

@@ -13,6 +13,7 @@ const scheduler_1 = __importDefault(require("./routes/scheduler"));
 const finance_1 = __importDefault(require("./routes/finance"));
 const resources_1 = __importDefault(require("./routes/resources"));
 const users_1 = __importDefault(require("./routes/users"));
+const cron_1 = require("./cron");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
@@ -32,6 +33,7 @@ app.get('/health', (req, res) => {
 });
 app.listen(PORT, () => {
     console.log(`SSMS Backend running on port ${PORT}`);
+    (0, cron_1.startCronJobs)();
     // Keep-alive self-pinger for Render Free Tier
     const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
     if (RENDER_URL) {

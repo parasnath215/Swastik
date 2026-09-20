@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import {  CheckCircle, AlertCircle, Trash2, Settings, Wrench, Box, Plus, ChevronDown, ChevronRight, Play, Edit2, Check, X, Clock, MessageSquare, ChevronUp  } from 'lucide-react';
+import {  CheckCircle, AlertCircle, Trash2, Settings, Wrench, Box, Plus, ChevronDown, ChevronRight, Play, Edit2, Check, X, Clock, MessageSquare, ChevronUp, Building2, Phone, MapPin, Ruler, IndianRupee, FileText  } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../store/useAuthStore';
 import CreatableSelect from 'react-select/creatable';
@@ -339,10 +339,50 @@ export default function PhaseManager() {
 
                {/* ACCORDION BODY (MASTER-DETAIL WORKSPACE) */}
                {isExpanded && (
-                 <div className="border-t border-slate-800/80 flex flex-col lg:flex-row bg-[#1e293b]/20 min-h-[500px]">
+                 <div className="border-t border-slate-800/80 flex flex-col bg-[#1e293b]/20">
                    
-                   {/* LEFT SIDEBAR: VERTICAL TIMELINE */}
-                   <div className="w-full lg:w-80 bg-[#0f172a]/50 p-6 border-r border-slate-800/80 flex flex-col relative shrink-0">
+                   {/* PROJECT OVERVIEW */}
+                   <div className="p-6 border-b border-slate-800/80 bg-slate-900/30">
+                     <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center">
+                       <Building2 className="w-3 h-3 mr-1" /> Project Details
+                     </h3>
+                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                       <div>
+                         <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Contact</p>
+                         <p className="text-sm text-slate-300 font-medium flex items-center"><Phone className="w-3 h-3 mr-2 text-slate-400" /> {activeProject.phone || 'N/A'}</p>
+                       </div>
+                       <div>
+                         <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Address</p>
+                         <p className="text-sm text-slate-300 font-medium flex items-center"><MapPin className="w-3 h-3 mr-2 text-slate-400" /> {activeProject.address || 'N/A'}</p>
+                       </div>
+                       <div>
+                         <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Specs & Budget</p>
+                         <p className="text-sm text-slate-300 font-medium flex items-center"><Ruler className="w-3 h-3 mr-2 text-slate-400" /> {activeProject.dimensions || 'N/A'}</p>
+                         <p className="text-sm text-slate-300 font-medium flex items-center mt-1"><IndianRupee className="w-3 h-3 mr-2 text-slate-400" /> {activeProject.budget?.toLocaleString() || '0'}</p>
+                       </div>
+                       {activeProject.files && activeProject.files.length > 0 && (
+                         <div>
+                           <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Files</p>
+                           <div className="space-y-1">
+                             {activeProject.files.map((file: any) => (
+                               <a 
+                                 key={file.id} 
+                                 href={`${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000'}${file.url}`} 
+                                 target="_blank" rel="noreferrer"
+                                 className="text-xs text-blue-400 hover:text-blue-300 flex items-center truncate max-w-full"
+                               >
+                                 <FileText className="w-3 h-3 mr-1 shrink-0" /> <span className="truncate">{file.name}</span>
+                               </a>
+                             ))}
+                           </div>
+                         </div>
+                       )}
+                     </div>
+                   </div>
+
+                   <div className="flex flex-col lg:flex-row flex-1 min-h-[500px]">
+                     {/* LEFT SIDEBAR: VERTICAL TIMELINE */}
+                     <div className="w-full lg:w-80 bg-[#0f172a]/50 p-6 border-r border-slate-800/80 flex flex-col relative shrink-0">
                       <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-8 ml-2">Production Phases</h3>
                       
                       <div className="absolute left-[45px] top-[85px] bottom-10 w-0.5 bg-slate-800 z-0 hidden lg:block"></div>
@@ -826,6 +866,7 @@ export default function PhaseManager() {
                       )}
                    </div>
                  </div>
+               </div>
                )}
             </div>
           );
