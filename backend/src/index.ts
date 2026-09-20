@@ -8,6 +8,7 @@ import schedulerRoutes from './routes/scheduler';
 import financeRoutes from './routes/finance';
 import resourceRoutes from './routes/resources';
 import userRoutes from './routes/users';
+import { startCronJobs } from './cron';
 
 dotenv.config();
 
@@ -34,6 +35,7 @@ app.get('/health', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`SSMS Backend running on port ${PORT}`);
+  startCronJobs();
 
   // Keep-alive self-pinger for Render Free Tier
   const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
